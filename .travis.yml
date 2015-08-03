@@ -1,0 +1,18 @@
+language: go
+
+services:
+- redis-server
+
+go:
+  - 1.3
+  - 1.4
+  - tip
+
+install:
+  - go get gopkg.in/redis.v3
+  - go get gopkg.in/vmihailenco/msgpack.v2
+  - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
+  - ln -s `pwd` $HOME/gopath/src/gopkg.in/go-redis/cache.v1
+
+before_script:
+  - redis-server --port 6380 &

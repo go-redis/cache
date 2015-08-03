@@ -1,13 +1,3 @@
-# Redis cache library for Go
-
-## Installation
-
-    go get gopkg.in/go-redis/cache.v1
-
-## Quickstart
-
-
-```go
 package cache_test
 
 import (
@@ -66,4 +56,3 @@ func Example_caching() {
 
 	// Output: {mystring 42}
 }
-```
