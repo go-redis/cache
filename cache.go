@@ -19,7 +19,15 @@ var (
 
 type Codec struct {
 	Ring *redis.Ring
-	// Local LRU cache for hot items.
+
+	// Local LRU cache for super hot items.
+	//
+	// Note that this cache stores passed Object as is without
+	// marshaling/unmarshaling it into binary form. As a result the Object can:
+	// - be shared between multiple gorouitines causing concurrent map writes;
+	// - prevent GC from freeing memory if it contains any pointers.
+	//
+	// Use it with care or better don't use at all.
 	Cache *lrucache.Cache
 
 	Marshal   func(interface{}) ([]byte, error)
