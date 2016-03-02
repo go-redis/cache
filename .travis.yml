@@ -15,6 +15,8 @@ matrix:
     - go: tip
 
 install:
+  - go get github.com/onsi/ginkgo
+  - go get github.com/onsi/gomega
   - go get gopkg.in/redis.v3
   - go get gopkg.in/vmihailenco/msgpack.v2
   - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
