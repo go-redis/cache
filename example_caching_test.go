@@ -18,7 +18,7 @@ func Example_caching() {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
-			"server2": ":6379",
+			"server2": ":6380",
 		},
 
 		DialTimeout:  3 * time.Second,

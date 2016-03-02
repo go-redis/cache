@@ -93,10 +93,12 @@ func (cd *Codec) Get(key string, v interface{}) error {
 		return err
 	}
 
-	if err := cd.Unmarshal(b, v); err != nil {
-		log.Printf("cache: Unmarshal failed: %s", err)
-		atomic.AddInt64(&cd.hits, 1)
-		return err
+	if v != nil {
+		if err := cd.Unmarshal(b, v); err != nil {
+			log.Printf("cache: Unmarshal failed: %s", err)
+			atomic.AddInt64(&cd.hits, 1)
+			return err
+		}
 	}
 
 	if cd.Cache != nil {
