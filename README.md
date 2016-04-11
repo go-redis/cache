@@ -14,9 +14,10 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/go-redis/cache.v3"
 	"gopkg.in/redis.v3"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"gopkg.in/go-redis/cache.v3"
 )
 
 type Object struct {
@@ -28,7 +29,7 @@ func Example_caching() {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
-			"server2": ":6379",
+			"server2": ":6380",
 		},
 
 		DialTimeout:  3 * time.Second,
@@ -37,7 +38,7 @@ func Example_caching() {
 	})
 
 	codec := &cache.Codec{
-		Ring: ring,
+		Redis: ring,
 
 		Marshal: func(v interface{}) ([]byte, error) {
 			return msgpack.Marshal(v)
