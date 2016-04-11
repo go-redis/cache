@@ -9,7 +9,7 @@ import (
 	"gopkg.in/redis.v3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
-	"gopkg.in/go-redis/cache.v1"
+	"gopkg.in/go-redis/cache.v3"
 )
 
 func TestModels(t *testing.T) {
@@ -33,7 +33,7 @@ var _ = Describe("Codec", func() {
 		})
 
 		codec = &cache.Codec{
-			Ring: ring,
+			Redis: ring,
 
 			Marshal: func(v interface{}) ([]byte, error) {
 				return msgpack.Marshal(v)

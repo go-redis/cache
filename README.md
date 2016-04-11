@@ -1,8 +1,8 @@
-# Redis cache library for Go
+# Redis cache library for Golang [![Build Status](https://travis-ci.org/go-redis/cache.svg?branch=v3)](https://travis-ci.org/go-redis/cache)
 
 ## Installation
 
-    go get gopkg.in/go-redis/cache.v1
+    go get gopkg.in/go-redis/cache.v3
 
 ## Quickstart
 
@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/go-redis/cache.v1"
+	"gopkg.in/go-redis/cache.v3"
 	"gopkg.in/redis.v3"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
