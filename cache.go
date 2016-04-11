@@ -1,4 +1,4 @@
-package cache // import "gopkg.in/go-redis/cache.v1"
+package cache // import "gopkg.in/go-redis/cache.v3"
 
 import (
 	"errors"
@@ -7,18 +7,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gopkg.in/go-redis/cache.v1/lrucache"
+	"gopkg.in/go-redis/cache.v3/lrucache"
 	"gopkg.in/redis.v3"
 )
 
 const defaultExpiration = 3 * 24 * time.Hour
 
-var (
-	ErrCacheMiss = errors.New("rediscache: cache miss")
-)
+var ErrCacheMiss = errors.New("rediscache: cache miss")
+
+type rediser interface {
+	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	Get(key string) *redis.StringCmd
+	Del(keys ...string) *redis.IntCmd
+}
 
 type Codec struct {
-	Ring *redis.Ring
+	Redis rediser
 
 	// Local LRU cache for super hot items.
 	//
@@ -63,7 +67,7 @@ func (cd *Codec) Set(item *Item) error {
 		return err
 	}
 
-	_, err = cd.Ring.Set(item.Key, b, item.Expiration).Result()
+	_, err = cd.Redis.Set(item.Key, b, item.Expiration).Result()
 	if err != nil {
 		log.Printf("cache: Set %s failed: %s", item.Key, err)
 	}
@@ -83,7 +87,7 @@ func (cd *Codec) Get(key string, v interface{}) error {
 		}
 	}
 
-	b, err := cd.Ring.Get(key).Bytes()
+	b, err := cd.Redis.Get(key).Bytes()
 	if err == redis.Nil {
 		atomic.AddInt64(&cd.misses, 1)
 		return ErrCacheMiss
@@ -115,7 +119,7 @@ func (cd *Codec) Delete(key string) error {
 		cd.Cache.Delete(key)
 	}
 
-	deleted, err := cd.Ring.Del(key).Result()
+	deleted, err := cd.Redis.Del(key).Result()
 	if err != nil {
 		log.Printf("cache: Del %s failed: %s", key, err)
 		return err
