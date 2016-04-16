@@ -1,4 +1,4 @@
-package cache // import "gopkg.in/go-redis/cache.v3"
+package cache // import "gopkg.in/go-redis/cache.v4"
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gopkg.in/go-redis/cache.v3/lrucache"
-	"gopkg.in/redis.v3"
+	"gopkg.in/go-redis/cache.v4/lrucache"
+	"gopkg.in/redis.v4"
 )
 
 const defaultExpiration = 3 * 24 * time.Hour

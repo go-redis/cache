@@ -6,10 +6,10 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"gopkg.in/redis.v3"
+	"gopkg.in/redis.v4"
 	"gopkg.in/vmihailenco/msgpack.v2"
 
-	"gopkg.in/go-redis/cache.v3"
+	"gopkg.in/go-redis/cache.v4"
 )
 
 func TestModels(t *testing.T) {
