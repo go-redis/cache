@@ -26,12 +26,12 @@ type Codec struct {
 
 	// Local LRU cache for super hot items.
 	//
-	// Note that this cache stores passed Object as is without
-	// marshaling/unmarshaling it into binary form. As a result the Object can:
-	// - be shared between multiple gorouitines causing concurrent map writes;
-	// - prevent GC from freeing memory if it contains any pointers.
+	// Note that this cache stores passed Object as is without marshaling it
+	// into the binary form. As the result the Object can:
+	// - be shared between multiple gorouitines causing concurrent reads/writes;
+	// - prevent GC from freeing memory if it contains pointers.
 	//
-	// Use it with care or better don't use at all.
+	// Use it with care.
 	Cache *lrucache.Cache
 
 	Marshal   func(interface{}) ([]byte, error)
@@ -48,7 +48,7 @@ type Item struct {
 	// Zero means the Item has no expiration time.
 	Expiration time.Duration
 
-	// Disables local LRU cache when set to true.
+	// DisableLocalCache disables local LRU cache when set to true.
 	DisableLocalCache bool
 }
 
@@ -78,6 +78,9 @@ func (cd *Codec) Get(key string, v interface{}) error {
 	if cd.Cache != nil {
 		elem, ok := cd.Cache.Get(key)
 		if ok {
+			if v == nil {
+				return nil
+			}
 			ev := reflect.ValueOf(elem)
 			if ev.Type().Kind() == reflect.Ptr {
 				ev = ev.Elem()
