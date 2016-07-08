@@ -106,8 +106,8 @@ var _ = Describe("Codec", func() {
 	Context("with Cache", func() {
 		BeforeEach(func() {
 			codec = &cache.Codec{
-				Redis: ring,
-				Cache: lrucache.New(time.Minute, 1000),
+				Redis:      ring,
+				LocalCache: lrucache.New(time.Minute, 1000),
 
 				Marshal: func(v interface{}) ([]byte, error) {
 					return msgpack.Marshal(v)
