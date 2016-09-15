@@ -15,16 +15,12 @@ type Object struct {
 	Num int
 }
 
-func Example_caching() {
+func Example_basicUsage() {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
 			"server2": ":6380",
 		},
-
-		DialTimeout:  3 * time.Second,
-		ReadTimeout:  time.Second,
-		WriteTimeout: time.Second,
 	})
 
 	codec := &cache.Codec{
@@ -56,4 +52,40 @@ func Example_caching() {
 	}
 
 	// Output: {mystring 42}
+}
+
+func Example_advancedUsage() {
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server1": ":6379",
+			"server2": ":6380",
+		},
+	})
+
+	codec := &cache.Codec{
+		Redis: ring,
+
+		Marshal: func(v interface{}) ([]byte, error) {
+			return msgpack.Marshal(v)
+		},
+		Unmarshal: func(b []byte, v interface{}) error {
+			return msgpack.Unmarshal(b, v)
+		},
+	}
+
+	v, err := codec.Do(&cache.Item{
+		Key:    "mykey",
+		Object: &Object{}, // destination
+		Func: func() (interface{}, error) {
+			return &Object{
+				Str: "mystring",
+				Num: 42,
+			}, nil
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(v.(*Object))
+	// Output: &{mystring 42}
 }

@@ -1,6 +1,7 @@
 package cache_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -19,17 +20,14 @@ func TestModels(t *testing.T) {
 }
 
 var _ = Describe("Codec", func() {
+	const key = "mykey"
+	var obj Object
+
 	var ring *redis.Ring
 	var codec *cache.Codec
 
 	testCodec := func() {
 		It("Gets and Sets data", func() {
-			key := "mykey"
-			obj := Object{
-				Str: "mystring",
-				Num: 42,
-			}
-
 			err := codec.Set(&cache.Item{
 				Key:        key,
 				Object:     obj,
@@ -43,9 +41,30 @@ var _ = Describe("Codec", func() {
 			Expect(wanted).To(Equal(obj))
 		})
 
-		It("Gets and Sets nil", func() {
-			key := "mykey"
+		It("supports cache func", func() {
+			got, err := codec.Do(&cache.Item{
+				Key:    key,
+				Object: Object{},
+				Func: func() (interface{}, error) {
+					return obj, nil
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(got).To(Equal(obj))
+		})
 
+		It("supports cache func that returns an error", func() {
+			got, err := codec.Do(&cache.Item{
+				Key: key,
+				Func: func() (interface{}, error) {
+					return nil, errors.New("error stub")
+				},
+			})
+			Expect(err).To(MatchError("error stub"))
+			Expect(got).To(BeNil())
+		})
+
+		It("Gets and Sets nil", func() {
 			err := codec.Set(&cache.Item{
 				Key:        key,
 				Expiration: time.Hour,
@@ -57,8 +76,6 @@ var _ = Describe("Codec", func() {
 		})
 
 		It("Deletes key", func() {
-			key := "mykey"
-
 			err := codec.Set(&cache.Item{
 				Key:        key,
 				Expiration: time.Hour,
@@ -84,6 +101,12 @@ var _ = Describe("Codec", func() {
 			ReadTimeout:  time.Second,
 			WriteTimeout: time.Second,
 		})
+		ring.FlushDb()
+
+		obj = Object{
+			Str: "mystring",
+			Num: 42,
+		}
 	})
 
 	Context("without Cache", func() {
