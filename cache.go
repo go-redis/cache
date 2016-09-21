@@ -47,10 +47,13 @@ type Item struct {
 }
 
 func (item *Item) object() (interface{}, error) {
+	if item.Object != nil {
+		return item.Object, nil
+	}
 	if item.Func != nil {
 		return item.Func()
 	}
-	return item.Object, nil
+	return nil, nil
 }
 
 // Set caches the item.
