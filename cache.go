@@ -79,7 +79,7 @@ func (cd *Codec) Set(item *Item) error {
 
 	err = cd.Redis.Set(item.Key, b, item.Expiration).Err()
 	if err != nil {
-		log.Printf("cache: Set key=%s failed: %s", item.Key, err)
+		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
 	}
 	return err
 }
@@ -91,7 +91,7 @@ func (cd *Codec) Get(key string, object interface{}) error {
 		atomic.AddInt64(&cd.misses, 1)
 		return ErrCacheMiss
 	} else if err != nil {
-		log.Printf("cache: Get key=%s failed: %s", key, err)
+		log.Printf("cache: Get key=%q failed: %s", key, err)
 		atomic.AddInt64(&cd.misses, 1)
 		return err
 	}
@@ -156,7 +156,7 @@ func (cd *Codec) Delete(key string) error {
 
 	deleted, err := cd.Redis.Del(key).Result()
 	if err != nil {
-		log.Printf("cache: Del key=%s failed: %s", key, err)
+		log.Printf("cache: Del key=%q failed: %s", key, err)
 		return err
 	}
 	if deleted == 0 {
