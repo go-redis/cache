@@ -1,4 +1,4 @@
-package cache // import "gopkg.in/go-redis/cache.v4"
+package cache // import "gopkg.in/go-redis/cache.v5"
 
 import (
 	"errors"
@@ -6,9 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gopkg.in/go-redis/cache.v4/internal/singleflight"
-	"gopkg.in/go-redis/cache.v4/lrucache"
-	"gopkg.in/redis.v4"
+	"gopkg.in/go-redis/cache.v5/lrucache"
+
+	"go4.org/syncutil/singleflight"
+	"gopkg.in/redis.v5"
 )
 
 const defaultExpiration = 3 * 24 * time.Hour

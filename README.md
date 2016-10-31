@@ -2,7 +2,7 @@
 
 ## Installation
 
-    go get gopkg.in/go-redis/cache.v3
+    go get gopkg.in/go-redis/cache.v5
 
 ## Quickstart
 
@@ -14,10 +14,10 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/redis.v4"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"gopkg.in/go-redis/cache.v5"
 
-	"gopkg.in/go-redis/cache.v4"
+	"gopkg.in/redis.v5"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Object struct {
