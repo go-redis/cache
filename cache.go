@@ -12,8 +12,6 @@ import (
 	"gopkg.in/redis.v5"
 )
 
-const defaultExpiration = 3 * 24 * time.Hour
-
 var ErrCacheMiss = errors.New("cache: keys is missing")
 
 type rediser interface {
@@ -43,7 +41,7 @@ type Item struct {
 	Func func() (interface{}, error)
 
 	// Expiration is the cache expiration time.
-	// Zero means the Item has no expiration time.
+	// Default expiration is 1 hour.
 	Expiration time.Duration
 }
 
@@ -59,8 +57,10 @@ func (item *Item) object() (interface{}, error) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
-	if item.Expiration != 0 && item.Expiration < time.Second {
-		panic("Expiration can't be less than 1 second")
+	if item.Expiration >= 0 && item.Expiration < time.Second {
+		item.Expiration = time.Hour
+	} else if item.Expiration == -1 {
+		item.Expiration = 0
 	}
 
 	object, err := item.object()
