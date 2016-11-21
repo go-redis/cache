@@ -12,7 +12,7 @@ import (
 	"gopkg.in/redis.v5"
 )
 
-var ErrCacheMiss = errors.New("cache: keys is missing")
+var ErrCacheMiss = errors.New("cache: key is missing")
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -88,48 +88,20 @@ func (cd *Codec) Set(item *Item) error {
 // Get gets the object for the given key.
 func (cd *Codec) Get(key string, object interface{}) error {
 	b, err := cd.getBytes(key)
-	if err == redis.Nil {
-		atomic.AddInt64(&cd.misses, 1)
-		return ErrCacheMiss
-	} else if err != nil {
-		log.Printf("cache: Get key=%q failed: %s", key, err)
-		atomic.AddInt64(&cd.misses, 1)
+	if err != nil {
 		return err
 	}
 
-	if object != nil {
-		if err := cd.Unmarshal(b, object); err != nil {
-			log.Printf("cache: Unmarshal failed: %s", err)
-			atomic.AddInt64(&cd.misses, 1)
-			return err
-		}
+	if object == nil || len(b) == 0 {
+		return nil
 	}
 
-	atomic.AddInt64(&cd.hits, 1)
+	if err := cd.Unmarshal(b, object); err != nil {
+		log.Printf("cache: Unmarshal(%v) failed: %s", object, err)
+		return err
+	}
+
 	return nil
-}
-
-// Do gets the item.Object for the given item.Key from the cache or
-// executes, caches, and returns the results of the given item.Func,
-// making sure that only one execution is in-flight for a given item.Key
-// at a time. If a duplicate comes in, the duplicate caller waits for the
-// original to complete and receives the same results.
-func (cd *Codec) Do(item *Item) (interface{}, error) {
-	if err := cd.Get(item.Key, item.Object); err == nil {
-		return item.Object, nil
-	}
-
-	return cd.group.Do(item.Key, func() (interface{}, error) {
-		obj, err := item.Func()
-		if err != nil {
-			return nil, err
-		}
-
-		item.Object = obj
-		cd.Set(item)
-
-		return obj, nil
-	})
 }
 
 func (cd *Codec) getBytes(key string) ([]byte, error) {
@@ -138,16 +110,56 @@ func (cd *Codec) getBytes(key string) ([]byte, error) {
 		if ok {
 			b, ok := v.([]byte)
 			if ok {
+				atomic.AddInt64(&cd.hits, 1)
 				return b, nil
 			}
 		}
 	}
 
 	b, err := cd.Redis.Get(key).Bytes()
-	if err == nil && cd.LocalCache != nil {
+	if err != nil {
+		atomic.AddInt64(&cd.misses, 1)
+		if err == redis.Nil {
+			return nil, ErrCacheMiss
+		}
+		log.Printf("cache: Get key=%q failed: %s", key, err)
+		return nil, err
+	}
+
+	if cd.LocalCache != nil {
 		cd.LocalCache.Set(key, b)
 	}
-	return b, err
+	return b, nil
+}
+
+// Do gets the item.Object for the given item.Key from the cache or
+// executes, caches, and returns the results of the given item.Func,
+// making sure that only one execution is in-flight for a given item.Key
+// at a time. If a duplicate comes in, the duplicate caller waits for the
+// original to complete and receives the same results.
+func (cd *Codec) Do(item *Item) (interface{}, error) {
+	return cd.group.Do(item.Key, func() (interface{}, error) {
+		var err error
+		if item.Object != nil {
+			err = cd.Get(item.Key, item.Object)
+		} else {
+			err = cd.Get(item.Key, &item.Object)
+		}
+		if err == nil {
+			return item.Object, nil
+		}
+
+		obj, err := item.Func()
+		if err != nil {
+			return nil, err
+		}
+
+		item.Object = obj
+		item.Func = nil
+		cd.Set(item)
+
+		return obj, nil
+	})
 }
 
 func (cd *Codec) Delete(key string) error {

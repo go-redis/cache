@@ -75,7 +75,7 @@ func Example_advancedUsage() {
 
 	v, err := codec.Do(&cache.Item{
 		Key:    "mykey",
-		Object: &Object{}, // destination
+		Object: new(Object), // destination
 		Func: func() (interface{}, error) {
 			return &Object{
 				Str: "mystring",
