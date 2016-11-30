@@ -156,10 +156,6 @@ var _ = Describe("Codec", func() {
 				"server1": ":6379",
 				"server2": ":6380",
 			},
-
-			DialTimeout:  3 * time.Second,
-			ReadTimeout:  time.Second,
-			WriteTimeout: time.Second,
 		})
 		_ = ring.ForEachShard(func(client *redis.Client) error {
 			return client.FlushDb().Err()
@@ -171,7 +167,7 @@ var _ = Describe("Codec", func() {
 		}
 	})
 
-	Context("without Cache", func() {
+	Context("without LocalCache", func() {
 		BeforeEach(func() {
 			codec = &cache.Codec{
 				Redis: ring,
@@ -192,7 +188,7 @@ var _ = Describe("Codec", func() {
 		testCodec()
 	})
 
-	Context("with Cache", func() {
+	Context("with LocalCache", func() {
 		BeforeEach(func() {
 			codec = &cache.Codec{
 				Redis:      ring,

@@ -138,14 +138,12 @@ func (cd *Codec) getBytes(key string) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Do(item *Item) (interface{}, error) {
+	if err := cd.getItem(item); err == nil {
+		return item.Object, nil
+	}
+
 	return cd.group.Do(item.Key, func() (interface{}, error) {
-		var err error
-		if item.Object != nil {
-			err = cd.Get(item.Key, item.Object)
-		} else {
-			err = cd.Get(item.Key, &item.Object)
-		}
-		if err == nil {
+		if err := cd.getItem(item); err == nil {
 			return item.Object, nil
 		}
 
@@ -160,6 +158,14 @@ func (cd *Codec) Do(item *Item) (interface{}, error) {
 
 		return obj, nil
 	})
+}
+
+func (cd *Codec) getItem(item *Item) error {
+	if item.Object != nil {
+		return cd.Get(item.Key, item.Object)
+	} else {
+		return cd.Get(item.Key, &item.Object)
+	}
 }
 
 func (cd *Codec) Delete(key string) error {
