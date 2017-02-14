@@ -138,10 +138,6 @@ func (cd *Codec) getBytes(key string) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Do(item *Item) (interface{}, error) {
-	if err := cd.getItem(item); err == nil {
-		return item.Object, nil
-	}
-
 	return cd.group.Do(item.Key, func() (interface{}, error) {
 		if err := cd.getItem(item); err == nil {
 			return item.Object, nil
