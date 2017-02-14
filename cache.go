@@ -97,7 +97,7 @@ func (cd *Codec) Get(key string, object interface{}) error {
 	}
 
 	if err := cd.Unmarshal(b, object); err != nil {
-		log.Printf("cache: Unmarshal(%v) failed: %s", object, err)
+		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", key, object, err)
 		return err
 	}
 
