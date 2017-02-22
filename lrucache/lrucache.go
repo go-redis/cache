@@ -37,22 +37,25 @@ func (c *Cache) Get(key string) (interface{}, bool) {
 }
 
 func (c *Cache) get(key string) (interface{}, bool) {
-	defer c.mu.Unlock()
 	c.mu.Lock()
 
 	el := c.table[key]
 	if el == nil {
+		c.mu.Unlock()
 		return nil, false
 	}
 
 	entry := el.Value.(*entry)
 	if time.Since(entry.addedAt) > c.expiration {
 		c.deleteElement(el)
+		c.mu.Unlock()
 		return nil, false
 	}
 
 	c.list.MoveToFront(el)
-	return entry.value, true
+	value := entry.value
+	c.mu.Unlock()
+	return value, true
 }
 
 func (c *Cache) Set(key string, value interface{}) {
@@ -82,8 +85,8 @@ func (c *Cache) Increment(key string, value int64) int64 {
 }
 
 func (c *Cache) Delete(key string) bool {
-	defer c.mu.Unlock()
 	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	el := c.table[key]
 	if el == nil {
