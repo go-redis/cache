@@ -5,8 +5,8 @@ services:
 - redis-server
 
 go:
-  - 1.6
   - 1.7
+  - 1.8
   - tip
 
 matrix:
@@ -18,7 +18,6 @@ install:
   - go get github.com/onsi/gomega
   - go get gopkg.in/redis.v5
   - go get gopkg.in/vmihailenco/msgpack.v2
-  - go get go4.org/syncutil/singleflight
   - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
   - mv `pwd` $HOME/gopath/src/gopkg.in/go-redis/cache.v5
 

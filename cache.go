@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gopkg.in/go-redis/cache.v5/lrucache"
-
-	"go4.org/syncutil/singleflight"
 	"gopkg.in/redis.v5"
+
+	"gopkg.in/go-redis/cache.v5/internal/singleflight"
+	"gopkg.in/go-redis/cache.v5/lrucache"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")

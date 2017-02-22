@@ -84,69 +84,126 @@ var _ = Describe("Codec", func() {
 			Expect(wanted).To(Equal(obj))
 		})
 
-		It("supports cache func", func() {
-			var callCount int64
-			perform(100, func(int) {
-				got, err := codec.Do(&cache.Item{
-					Key:    key,
-					Object: new(Object),
-					Func: func() (interface{}, error) {
-						atomic.AddInt64(&callCount, 1)
-						return obj, nil
-					},
+		Describe("Do func", func() {
+			It("works with Object", func() {
+				var callCount int64
+				perform(100, func(int) {
+					got, err := codec.Do(&cache.Item{
+						Key:    key,
+						Object: new(Object),
+						Func: func() (interface{}, error) {
+							atomic.AddInt64(&callCount, 1)
+							return obj, nil
+						},
+					})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(got).To(Equal(obj))
 				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(got).To(Equal(obj))
+				Expect(callCount).To(Equal(int64(1)))
 			})
-			Expect(atomic.LoadInt64(&callCount)).To(Equal(int64(1)))
-		})
 
-		It("supports cache func without Object", func() {
-			var callCount int64
-			perform(100, func(int) {
-				got, err := codec.Do(&cache.Item{
-					Key: key,
-					Func: func() (interface{}, error) {
-						atomic.AddInt64(&callCount, 1)
-						return true, nil
-					},
+			It("works without Object", func() {
+				var callCount int64
+				perform(100, func(int) {
+					got, err := codec.Do(&cache.Item{
+						Key: key,
+						Func: func() (interface{}, error) {
+							atomic.AddInt64(&callCount, 1)
+							return true, nil
+						},
+					})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(got).To(BeTrue())
 				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(got).To(BeTrue())
+				Expect(callCount).To(Equal(int64(1)))
 			})
-			Expect(atomic.LoadInt64(&callCount)).To(Equal(int64(1)))
-		})
 
-		It("supports cache func without Object", func() {
-			var callCount int64
-			perform(100, func(int) {
-				got, err := codec.Do(&cache.Item{
-					Key: key,
-					Func: func() (interface{}, error) {
-						atomic.AddInt64(&callCount, 1)
-						return nil, nil
-					},
+			It("works without Object and nil result", func() {
+				var callCount int64
+				perform(100, func(int) {
+					got, err := codec.Do(&cache.Item{
+						Key: key,
+						Func: func() (interface{}, error) {
+							atomic.AddInt64(&callCount, 1)
+							return nil, nil
+						},
+					})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(got).To(BeNil())
 				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(got).To(BeNil())
+				Expect(callCount).To(Equal(int64(1)))
 			})
-			Expect(atomic.LoadInt64(&callCount)).To(Equal(int64(1)))
-		})
 
-		It("supports cache func that returns an error", func() {
-			var callCount int64
-			perform(100, func(int) {
-				got, err := codec.Do(&cache.Item{
-					Key: key,
-					Func: func() (interface{}, error) {
-						atomic.AddInt64(&callCount, 1)
-						return nil, errors.New("error stub")
-					},
+			It("works without Object and error result", func() {
+				var callCount int64
+				perform(100, func(int) {
+					got, err := codec.Do(&cache.Item{
+						Key: key,
+						Func: func() (interface{}, error) {
+							atomic.AddInt64(&callCount, 1)
+							return nil, errors.New("error stub")
+						},
+					})
+					Expect(err).To(MatchError("error stub"))
+					Expect(got).To(BeNil())
 				})
-				Expect(err).To(MatchError("error stub"))
-				Expect(got).To(BeNil())
+				Expect(callCount).To(Equal(int64(100)))
 			})
-			Expect(atomic.LoadInt64(&callCount)).To(BeNumerically(">=", int64(1)))
+
+			It("does not cache error result", func() {
+				var callCount int64
+				do := func() (int, error) {
+					obj, err := codec.Do(&cache.Item{
+						Key: key,
+						Func: func() (interface{}, error) {
+							time.Sleep(time.Millisecond)
+
+							n := atomic.AddInt64(&callCount, 1)
+							if n == 1 {
+								return nil, errors.New("error stub")
+							}
+							return 42, nil
+						},
+					})
+					if err != nil {
+						return 0, err
+					}
+					return obj.(int), nil
+				}
+
+				var wg sync.WaitGroup
+
+				wg.Add(1)
+				go func() {
+					defer GinkgoRecover()
+					defer wg.Done()
+
+					wg.Done()
+					n, err := do()
+					Expect(err).To(MatchError("error stub"))
+					Expect(n).To(Equal(0))
+				}()
+				wg.Wait()
+
+				for i := 0; i < 3; i++ {
+					wg.Add(1)
+					go func() {
+						defer GinkgoRecover()
+						defer wg.Done()
+
+						wg.Done()
+						n, err := do()
+						Expect(err).NotTo(HaveOccurred())
+						Expect(n).To(Equal(42))
+					}()
+					wg.Wait()
+				}
+
+				wg.Add(4)
+				wg.Wait()
+
+				Expect(callCount).To(Equal(int64(2)))
+			})
 		})
 	}
 
