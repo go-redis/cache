@@ -151,23 +151,23 @@ var _ = Describe("Codec", func() {
 
 			It("does not cache error result", func() {
 				var callCount int64
-				do := func() (int, error) {
+				do := func(sleep time.Duration) (int, error) {
 					obj, err := codec.Do(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
-							time.Sleep(time.Millisecond)
+							time.Sleep(sleep)
 
 							n := atomic.AddInt64(&callCount, 1)
 							if n == 1 {
 								return nil, errors.New("error stub")
 							}
-							return 42, nil
+							return uint64(42), nil
 						},
 					})
 					if err != nil {
 						return 0, err
 					}
-					return obj.(int), nil
+					return int(obj.(uint64)), nil
 				}
 
 				var wg sync.WaitGroup
@@ -178,29 +178,26 @@ var _ = Describe("Codec", func() {
 					defer wg.Done()
 
 					wg.Done()
-					n, err := do()
+					n, err := do(time.Millisecond)
 					Expect(err).To(MatchError("error stub"))
 					Expect(n).To(Equal(0))
 				}()
 				wg.Wait()
+				wg.Add(1)
 
-				for i := 0; i < 3; i++ {
-					wg.Add(1)
-					go func() {
-						defer GinkgoRecover()
-						defer wg.Done()
+				perform(10, func(int) {
+					n, err := do(time.Millisecond)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(n).To(Equal(42))
+				})
 
-						wg.Done()
-						n, err := do()
-						Expect(err).NotTo(HaveOccurred())
-						Expect(n).To(Equal(42))
-					}()
-					wg.Wait()
-				}
+				perform(10, func(int) {
+					n, err := do(0)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(n).To(Equal(42))
+				})
 
-				wg.Add(4)
 				wg.Wait()
-
 				Expect(callCount).To(Equal(int64(2)))
 			})
 		})
