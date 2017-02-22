@@ -41,7 +41,6 @@ var _ = Describe("Codec", func() {
 	const key = "mykey"
 	var obj *Object
 
-	var ring *redis.Ring
 	var codec *cache.Codec
 
 	testCodec := func() {
@@ -208,16 +207,6 @@ var _ = Describe("Codec", func() {
 	}
 
 	BeforeEach(func() {
-		ring = redis.NewRing(&redis.RingOptions{
-			Addrs: map[string]string{
-				"server1": ":6379",
-				"server2": ":6380",
-			},
-		})
-		_ = ring.ForEachShard(func(client *redis.Client) error {
-			return client.FlushDb().Err()
-		})
-
 		obj = &Object{
 			Str: "mystring",
 			Num: 42,
@@ -226,20 +215,7 @@ var _ = Describe("Codec", func() {
 
 	Context("without LocalCache", func() {
 		BeforeEach(func() {
-			codec = &cache.Codec{
-				Redis: ring,
-
-				Marshal: func(v interface{}) ([]byte, error) {
-					return msgpack.Marshal(v)
-				},
-				Unmarshal: func(b []byte, v interface{}) error {
-					return msgpack.Unmarshal(b, v)
-				},
-			}
-
-			_ = ring.ForEachShard(func(client *redis.Client) error {
-				return client.FlushDb().Err()
-			})
+			codec = newCodec()
 		})
 
 		testCodec()
@@ -247,19 +223,32 @@ var _ = Describe("Codec", func() {
 
 	Context("with LocalCache", func() {
 		BeforeEach(func() {
-			codec = &cache.Codec{
-				Redis:      ring,
-				LocalCache: lrucache.New(time.Minute, 1000),
-
-				Marshal: func(v interface{}) ([]byte, error) {
-					return msgpack.Marshal(v)
-				},
-				Unmarshal: func(b []byte, v interface{}) error {
-					return msgpack.Unmarshal(b, v)
-				},
-			}
+			codec = newCodec()
+			codec.LocalCache = lrucache.New(time.Minute, 1000)
 		})
 
 		testCodec()
 	})
 })
+
+func newCodec() *cache.Codec {
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server1": ":6379",
+		},
+	})
+	_ = ring.ForEachShard(func(client *redis.Client) error {
+		return client.FlushDb().Err()
+	})
+
+	return &cache.Codec{
+		Redis: ring,
+
+		Marshal: func(v interface{}) ([]byte, error) {
+			return msgpack.Marshal(v)
+		},
+		Unmarshal: func(b []byte, v interface{}) error {
+			return msgpack.Unmarshal(b, v)
+		},
+	}
+}

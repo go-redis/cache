@@ -87,7 +87,11 @@ func (cd *Codec) Set(item *Item) error {
 
 // Get gets the object for the given key.
 func (cd *Codec) Get(key string, object interface{}) error {
-	b, err := cd.getBytes(key)
+	return cd.get(key, object, false)
+}
+
+func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error {
+	b, err := cd.getBytes(key, onlyLocalCache)
 	if err != nil {
 		return err
 	}
@@ -104,7 +108,7 @@ func (cd *Codec) Get(key string, object interface{}) error {
 	return nil
 }
 
-func (cd *Codec) getBytes(key string) ([]byte, error) {
+func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	if cd.LocalCache != nil {
 		v, ok := cd.LocalCache.Get(key)
 		if ok {
@@ -114,6 +118,10 @@ func (cd *Codec) getBytes(key string) ([]byte, error) {
 				return b, nil
 			}
 		}
+	}
+
+	if onlyLocalCache {
+		return nil, ErrCacheMiss
 	}
 
 	b, err := cd.Redis.Get(key).Bytes()
@@ -138,6 +146,11 @@ func (cd *Codec) getBytes(key string) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Do(item *Item) (interface{}, error) {
+	if cd.LocalCache != nil {
+		if err := cd.getItemFast(item); err == nil {
+			return item.Object, nil
+		}
+	}
 	return cd.group.Do(item.Key, func() (interface{}, error) {
 		if err := cd.getItem(item); err == nil {
 			return item.Object, nil
@@ -157,6 +170,14 @@ func (cd *Codec) Do(item *Item) (interface{}, error) {
 }
 
 func (cd *Codec) getItem(item *Item) error {
+	return cd._getItem(item, false)
+}
+
+func (cd *Codec) getItemFast(item *Item) error {
+	return cd._getItem(item, true)
+}
+
+func (cd *Codec) _getItem(item *Item, onlyLocalCache bool) error {
 	if item.Object != nil {
 		return cd.Get(item.Key, item.Object)
 	} else {
