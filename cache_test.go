@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/go-redis/cache.v5"
-	"gopkg.in/go-redis/cache.v5/lrucache"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"gopkg.in/redis.v5"
 	"gopkg.in/vmihailenco/msgpack.v2"
+
+	"gopkg.in/go-redis/cache.v5"
+	"gopkg.in/go-redis/cache.v5/lrucache"
 )
 
 func TestModels(t *testing.T) {
@@ -139,6 +139,7 @@ var _ = Describe("Codec", func() {
 					got, err := codec.Do(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
+							time.Sleep(100 * time.Millisecond)
 							atomic.AddInt64(&callCount, 1)
 							return nil, errors.New("error stub")
 						},
@@ -146,7 +147,7 @@ var _ = Describe("Codec", func() {
 					Expect(err).To(MatchError("error stub"))
 					Expect(got).To(BeNil())
 				})
-				Expect(callCount).To(Equal(int64(100)))
+				Expect(callCount).To(Equal(int64(1)))
 			})
 
 			It("does not cache error result", func() {
@@ -170,34 +171,18 @@ var _ = Describe("Codec", func() {
 					return int(obj.(uint64)), nil
 				}
 
-				var wg sync.WaitGroup
-
-				wg.Add(1)
-				go func() {
-					defer GinkgoRecover()
-					defer wg.Done()
-
-					wg.Done()
-					n, err := do(time.Millisecond)
+				perform(100, func(int) {
+					n, err := do(100 * time.Millisecond)
 					Expect(err).To(MatchError("error stub"))
 					Expect(n).To(Equal(0))
-				}()
-				wg.Wait()
-				wg.Add(1)
-
-				perform(10, func(int) {
-					n, err := do(time.Millisecond)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(n).To(Equal(42))
 				})
 
-				perform(10, func(int) {
+				perform(100, func(int) {
 					n, err := do(0)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(n).To(Equal(42))
 				})
 
-				wg.Wait()
 				Expect(callCount).To(Equal(int64(2)))
 			})
 		})

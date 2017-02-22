@@ -6,9 +6,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go4.org/syncutil/singleflight"
 	"gopkg.in/redis.v5"
 
-	"gopkg.in/go-redis/cache.v5/internal/singleflight"
 	"gopkg.in/go-redis/cache.v5/lrucache"
 )
 
