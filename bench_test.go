@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/go-redis/cache.v5"
-	"gopkg.in/go-redis/cache.v5/lrucache"
+	"github.com/go-redis/cache"
+	"github.com/go-redis/cache/lrucache"
 )
 
 func BenchmarkDo(b *testing.B) {

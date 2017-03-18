@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/go-redis/cache.v5"
+	"github.com/go-redis/cache"
 
-	"gopkg.in/redis.v5"
+	"github.com/go-redis/redis"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 

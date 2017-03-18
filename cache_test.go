@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/cache"
+	"github.com/go-redis/cache/lrucache"
+
+	"github.com/go-redis/redis"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"gopkg.in/redis.v5"
 	"gopkg.in/vmihailenco/msgpack.v2"
-
-	"gopkg.in/go-redis/cache.v5"
-	"gopkg.in/go-redis/cache.v5/lrucache"
 )
 
 func TestModels(t *testing.T) {

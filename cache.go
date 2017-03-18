@@ -1,4 +1,4 @@
-package cache // import "gopkg.in/go-redis/cache.v5"
+package cache
 
 import (
 	"errors"
@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go4.org/syncutil/singleflight"
-	"gopkg.in/redis.v5"
+	"github.com/go-redis/cache/lrucache"
 
-	"gopkg.in/go-redis/cache.v5/lrucache"
+	"github.com/go-redis/redis"
+	"go4.org/syncutil/singleflight"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
