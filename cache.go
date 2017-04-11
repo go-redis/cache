@@ -37,7 +37,7 @@ type Item struct {
 	Key    string
 	Object interface{}
 
-	// Func returns object to cache.
+	// Func returns object to be cached.
 	Func func() (interface{}, error)
 
 	// Expiration is the cache expiration time.
@@ -70,7 +70,7 @@ func (cd *Codec) Set(item *Item) error {
 
 	b, err := cd.Marshal(object)
 	if err != nil {
-		log.Printf("cache: Marshal failed: %s", err)
+		log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
 		return err
 	}
 
@@ -161,11 +161,17 @@ func (cd *Codec) Do(item *Item) (interface{}, error) {
 			return nil, err
 		}
 
-		item.Object = obj
-		item.Func = nil
-		cd.Set(item)
+		cd.Set(&Item{
+			Key:        item.Key,
+			Object:     obj,
+			Expiration: item.Expiration,
+		})
 
-		return obj, nil
+		err = cd.getItem(item)
+		if err != nil {
+			return nil, err
+		}
+		return item.Object, nil
 	})
 }
 

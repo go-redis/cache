@@ -101,6 +101,23 @@ var _ = Describe("Codec", func() {
 				Expect(callCount).To(Equal(int64(1)))
 			})
 
+			It("works with ptr and non-ptr", func() {
+				var callCount int64
+				perform(100, func(int) {
+					got, err := codec.Do(&cache.Item{
+						Key:    key,
+						Object: new(Object),
+						Func: func() (interface{}, error) {
+							atomic.AddInt64(&callCount, 1)
+							return *obj, nil
+						},
+					})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(got).To(Equal(obj))
+				})
+				Expect(callCount).To(Equal(int64(1)))
+			})
+
 			It("works without Object", func() {
 				var callCount int64
 				perform(100, func(int) {
