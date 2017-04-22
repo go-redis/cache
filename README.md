@@ -82,7 +82,7 @@ func Example_advancedUsage() {
 		},
 	}
 
-	v, err := codec.Do(&cache.Item{
+	v, err := codec.Once(&cache.Item{
 		Key:    "mykey",
 		Object: new(Object), // destination
 		Func: func() (interface{}, error) {

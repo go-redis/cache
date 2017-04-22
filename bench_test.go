@@ -17,8 +17,8 @@ func BenchmarkDo(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			n, err := codec.Do(&cache.Item{
-				Key: "bench-do",
+			n, err := codec.Once(&cache.Item{
+				Key: "bench-once",
 				Func: func() (interface{}, error) {
 					return uint64(42), nil
 				},
