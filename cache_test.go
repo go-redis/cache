@@ -87,7 +87,7 @@ var _ = Describe("Codec", func() {
 			It("works with Object", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Do(&cache.Item{
+					got, err := codec.Once(&cache.Item{
 						Key:    key,
 						Object: new(Object),
 						Func: func() (interface{}, error) {
@@ -104,7 +104,7 @@ var _ = Describe("Codec", func() {
 			It("works with ptr and non-ptr", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Do(&cache.Item{
+					got, err := codec.Once(&cache.Item{
 						Key:    key,
 						Object: new(Object),
 						Func: func() (interface{}, error) {
@@ -121,7 +121,7 @@ var _ = Describe("Codec", func() {
 			It("works without Object", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Do(&cache.Item{
+					got, err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
@@ -137,7 +137,7 @@ var _ = Describe("Codec", func() {
 			It("works without Object and nil result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Do(&cache.Item{
+					got, err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
@@ -153,7 +153,7 @@ var _ = Describe("Codec", func() {
 			It("works without Object and error result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Do(&cache.Item{
+					got, err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							time.Sleep(100 * time.Millisecond)
@@ -170,7 +170,7 @@ var _ = Describe("Codec", func() {
 			It("does not cache error result", func() {
 				var callCount int64
 				do := func(sleep time.Duration) (int, error) {
-					obj, err := codec.Do(&cache.Item{
+					obj, err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							time.Sleep(sleep)

@@ -140,12 +140,12 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	return b, nil
 }
 
-// Do gets the item.Object for the given item.Key from the cache or
+// Once gets the item.Object for the given item.Key from the cache or
 // executes, caches, and returns the results of the given item.Func,
 // making sure that only one execution is in-flight for a given item.Key
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
-func (cd *Codec) Do(item *Item) (interface{}, error) {
+func (cd *Codec) Once(item *Item) (interface{}, error) {
 	if cd.LocalCache != nil {
 		if err := cd.getItemFast(item); err == nil {
 			return item.Object, nil
