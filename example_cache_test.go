@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/cache"
-
 	"github.com/go-redis/redis"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
+
+	"github.com/go-redis/cache"
 )
 
 type Object struct {
