@@ -16,7 +16,7 @@ import (
 
 	"github.com/go-redis/cache"
 	"github.com/go-redis/redis"
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Object struct {
