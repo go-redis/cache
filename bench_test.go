@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/go-redis/cache"
-	"github.com/go-redis/cache/lrucache"
 )
 
 func BenchmarkDo(b *testing.B) {
 	codec := newCodec()
-	codec.LocalCache = lrucache.New(time.Minute, 1000)
+	codec.UseLocalCache(1000, time.Minute)
 
 	b.ResetTimer()
 

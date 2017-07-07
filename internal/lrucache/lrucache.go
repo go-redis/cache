@@ -22,7 +22,7 @@ type Cache struct {
 	maxLen     int
 }
 
-func New(expiration time.Duration, maxLen int) *Cache {
+func New(maxLen int, expiration time.Duration) *Cache {
 	return &Cache{
 		list:  list.New(),
 		table: make(map[string]*list.Element, maxLen),

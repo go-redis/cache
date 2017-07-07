@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-redis/cache/lrucache"
-
 	"github.com/go-redis/redis"
 	"go4.org/syncutil/singleflight"
+
+	"github.com/go-redis/cache/internal/lrucache"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -18,19 +18,6 @@ type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
 	Get(key string) *redis.StringCmd
 	Del(keys ...string) *redis.IntCmd
-}
-
-type Codec struct {
-	Redis rediser
-
-	// Local LRU cache for super hot items.
-	LocalCache *lrucache.Cache
-
-	Marshal   func(interface{}) ([]byte, error)
-	Unmarshal func([]byte, interface{}) error
-
-	group        singleflight.Group
-	hits, misses int64
 }
 
 type Item struct {
@@ -55,6 +42,23 @@ func (item *Item) object() (interface{}, error) {
 	return nil, nil
 }
 
+type Codec struct {
+	Redis rediser
+
+	localCache *lrucache.Cache
+
+	Marshal   func(interface{}) ([]byte, error)
+	Unmarshal func([]byte, interface{}) error
+
+	group        singleflight.Group
+	hits, misses int64
+}
+
+// UseLocalCache causes Codec to cache items in local LRU cache.
+func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
+	cd.localCache = lrucache.New(maxLen, expiration)
+}
+
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
 	if item.Expiration >= 0 && item.Expiration < time.Second {
@@ -74,8 +78,8 @@ func (cd *Codec) Set(item *Item) error {
 		return err
 	}
 
-	if cd.LocalCache != nil {
-		cd.LocalCache.Set(item.Key, b)
+	if cd.localCache != nil {
+		cd.localCache.Set(item.Key, b)
 	}
 
 	err = cd.Redis.Set(item.Key, b, item.Expiration).Err()
@@ -109,8 +113,8 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 }
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
-	if cd.LocalCache != nil {
-		v, ok := cd.LocalCache.Get(key)
+	if cd.localCache != nil {
+		v, ok := cd.localCache.Get(key)
 		if ok {
 			b, ok := v.([]byte)
 			if ok {
@@ -134,8 +138,8 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, err
 	}
 
-	if cd.LocalCache != nil {
-		cd.LocalCache.Set(key, b)
+	if cd.localCache != nil {
+		cd.localCache.Set(key, b)
 	}
 	return b, nil
 }
@@ -146,7 +150,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Once(item *Item) (interface{}, error) {
-	if cd.LocalCache != nil {
+	if cd.localCache != nil {
 		if err := cd.getItemFast(item); err == nil {
 			return item.Object, nil
 		}
@@ -192,8 +196,8 @@ func (cd *Codec) _getItem(item *Item, onlyLocalCache bool) error {
 }
 
 func (cd *Codec) Delete(key string) error {
-	if cd.LocalCache != nil {
-		cd.LocalCache.Delete(key)
+	if cd.localCache != nil {
+		cd.localCache.Delete(key)
 	}
 
 	deleted, err := cd.Redis.Del(key).Result()

@@ -13,7 +13,6 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/go-redis/cache"
-	"github.com/go-redis/cache/lrucache"
 )
 
 func TestModels(t *testing.T) {
@@ -223,7 +222,7 @@ var _ = Describe("Codec", func() {
 	Context("with LocalCache", func() {
 		BeforeEach(func() {
 			codec = newCodec()
-			codec.LocalCache = lrucache.New(time.Minute, 1000)
+			codec.UseLocalCache(1000, time.Minute)
 		})
 
 		testCodec()
