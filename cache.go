@@ -42,6 +42,16 @@ func (item *Item) object() (interface{}, error) {
 	return nil, nil
 }
 
+func (item *Item) exp() time.Duration {
+	if item.Expiration < 0 {
+		return 0
+	}
+	if item.Expiration < time.Second {
+		return time.Hour
+	}
+	return item.Expiration
+}
+
 type Codec struct {
 	Redis rediser
 
@@ -61,12 +71,6 @@ func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
-	if item.Expiration >= 0 && item.Expiration < time.Second {
-		item.Expiration = time.Hour
-	} else if item.Expiration == -1 {
-		item.Expiration = 0
-	}
-
 	object, err := item.object()
 	if err != nil {
 		return err
@@ -82,7 +86,7 @@ func (cd *Codec) Set(item *Item) error {
 		cd.localCache.Set(item.Key, b)
 	}
 
-	err = cd.Redis.Set(item.Key, b, item.Expiration).Err()
+	err = cd.Redis.Set(item.Key, b, item.exp()).Err()
 	if err != nil {
 		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
 	}
@@ -155,6 +159,7 @@ func (cd *Codec) Once(item *Item) (interface{}, error) {
 			return item.Object, nil
 		}
 	}
+
 	return cd.group.Do(item.Key, func() (interface{}, error) {
 		if err := cd.getItem(item); err == nil {
 			return item.Object, nil
