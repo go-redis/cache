@@ -118,13 +118,10 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	if cd.localCache != nil {
-		v, ok := cd.localCache.Get(key)
+		b, ok := cd.localCache.Get(key)
 		if ok {
-			b, ok := v.([]byte)
-			if ok {
-				atomic.AddInt64(&cd.hits, 1)
-				return b, nil
-			}
+			atomic.AddInt64(&cd.hits, 1)
+			return b, nil
 		}
 	}
 

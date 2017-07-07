@@ -8,7 +8,7 @@ import (
 
 type entry struct {
 	key     string
-	value   interface{}
+	value   []byte
 	addedAt time.Time
 }
 
@@ -32,11 +32,11 @@ func New(maxLen int, expiration time.Duration) *Cache {
 	}
 }
 
-func (c *Cache) Get(key string) (interface{}, bool) {
+func (c *Cache) Get(key string) ([]byte, bool) {
 	return c.get(key)
 }
 
-func (c *Cache) get(key string) (interface{}, bool) {
+func (c *Cache) get(key string) ([]byte, bool) {
 	c.mu.Lock()
 
 	el := c.table[key]
@@ -58,7 +58,7 @@ func (c *Cache) get(key string) (interface{}, bool) {
 	return value, true
 }
 
-func (c *Cache) Set(key string, value interface{}) {
+func (c *Cache) Set(key string, value []byte) {
 	c.mu.Lock()
 	if el := c.table[key]; el != nil {
 		entry := el.Value.(*entry)
@@ -68,20 +68,6 @@ func (c *Cache) Set(key string, value interface{}) {
 		c.addNew(key, value)
 	}
 	c.mu.Unlock()
-}
-
-func (c *Cache) Increment(key string, value int64) int64 {
-	c.mu.Lock()
-	if el := c.table[key]; el != nil {
-		entry := el.Value.(*entry)
-		value += entry.value.(int64)
-		entry.value = value
-		c.promote(el, entry)
-	} else {
-		c.addNew(key, value)
-	}
-	c.mu.Unlock()
-	return value
 }
 
 func (c *Cache) Delete(key string) bool {
@@ -109,7 +95,7 @@ func (c *Cache) Flush() error {
 	return nil
 }
 
-func (c *Cache) addNew(key string, value interface{}) {
+func (c *Cache) addNew(key string, value []byte) {
 	newEntry := &entry{
 		key:     key,
 		value:   value,
