@@ -185,9 +185,9 @@ func (cd *Codec) getItemFast(item *Item) error {
 
 func (cd *Codec) _getItem(item *Item, onlyLocalCache bool) error {
 	if item.Object != nil {
-		return cd.Get(item.Key, item.Object)
+		return cd.get(item.Key, item.Object, onlyLocalCache)
 	} else {
-		return cd.Get(item.Key, &item.Object)
+		return cd.get(item.Key, &item.Object, onlyLocalCache)
 	}
 }
 
