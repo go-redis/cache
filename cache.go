@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
-	"go4.org/syncutil/singleflight"
 
 	"github.com/go-redis/cache/internal/lrucache"
+	"github.com/go-redis/cache/internal/singleflight"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")

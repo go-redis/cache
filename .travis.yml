@@ -18,7 +18,6 @@ install:
   - go get github.com/onsi/gomega
   - go get github.com/go-redis/redis
   - go get github.com/vmihailenco/msgpack
-  - go get go4.org/syncutil/singleflight
 
 before_script:
   - redis-server --port 6380 &
