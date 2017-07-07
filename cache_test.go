@@ -185,7 +185,7 @@ var _ = Describe("Codec", func() {
 					if err != nil {
 						return 0, err
 					}
-					return int(obj.(uint64)), nil
+					return int(obj.(int8)), nil
 				}
 
 				perform(100, func(int) {
