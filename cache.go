@@ -71,15 +71,20 @@ func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
+	_, err := cd.set(item)
+	return err
+}
+
+func (cd *Codec) set(item *Item) ([]byte, error) {
 	object, err := item.object()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	b, err := cd.Marshal(object)
 	if err != nil {
 		log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
-		return err
+		return nil, err
 	}
 
 	if cd.localCache != nil {
@@ -90,7 +95,7 @@ func (cd *Codec) Set(item *Item) error {
 	if err != nil {
 		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
 	}
-	return err
+	return b, err
 }
 
 // Get gets the object for the given key.
@@ -150,16 +155,37 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 // making sure that only one execution is in-flight for a given item.Key
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
-func (cd *Codec) Once(item *Item) (interface{}, error) {
+func (cd *Codec) Once(item *Item) error {
+	b, err := cd.getItemBytesOnce(item)
+	if err != nil {
+		return err
+	}
+
+	if item.Object == nil || len(b) == 0 {
+		return nil
+	}
+
+	err = cd.Unmarshal(b, item.Object)
+	if err != nil {
+		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
+		return err
+	}
+
+	return nil
+}
+
+func (cd *Codec) getItemBytesOnce(item *Item) ([]byte, error) {
 	if cd.localCache != nil {
-		if err := cd.getItemFast(item); err == nil {
-			return item.Object, nil
+		b, err := cd.getItemBytesFast(item)
+		if err == nil {
+			return b, nil
 		}
 	}
 
-	return cd.group.Do(item.Key, func() (interface{}, error) {
-		if err := cd.getItem(item); err == nil {
-			return item.Object, nil
+	obj, err := cd.group.Do(item.Key, func() (interface{}, error) {
+		b, err := cd.getItemBytes(item)
+		if err == nil {
+			return b, nil
 		}
 
 		obj, err := item.Func()
@@ -167,34 +193,25 @@ func (cd *Codec) Once(item *Item) (interface{}, error) {
 			return nil, err
 		}
 
-		cd.Set(&Item{
+		b, err = cd.set(&Item{
 			Key:        item.Key,
 			Object:     obj,
 			Expiration: item.Expiration,
 		})
-
-		err = cd.getItem(item)
-		if err != nil {
-			return nil, err
-		}
-		return item.Object, nil
+		return b, err
 	})
-}
-
-func (cd *Codec) getItem(item *Item) error {
-	return cd._getItem(item, false)
-}
-
-func (cd *Codec) getItemFast(item *Item) error {
-	return cd._getItem(item, true)
-}
-
-func (cd *Codec) _getItem(item *Item, onlyLocalCache bool) error {
-	if item.Object != nil {
-		return cd.get(item.Key, item.Object, onlyLocalCache)
-	} else {
-		return cd.get(item.Key, &item.Object, onlyLocalCache)
+	if err != nil {
+		return nil, err
 	}
+	return obj.([]byte), nil
+}
+
+func (cd *Codec) getItemBytes(item *Item) ([]byte, error) {
+	return cd.getBytes(item.Key, false)
+}
+
+func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
+	return cd.getBytes(item.Key, true)
 }
 
 func (cd *Codec) Delete(key string) error {

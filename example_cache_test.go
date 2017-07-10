@@ -73,9 +73,10 @@ func Example_advancedUsage() {
 		},
 	}
 
-	v, err := codec.Once(&cache.Item{
+	obj := new(Object)
+	err := codec.Once(&cache.Item{
 		Key:    "mykey",
-		Object: new(Object), // destination
+		Object: obj, // destination
 		Func: func() (interface{}, error) {
 			return &Object{
 				Str: "mystring",
@@ -86,6 +87,6 @@ func Example_advancedUsage() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(v.(*Object))
+	fmt.Println(obj)
 	// Output: &{mystring 42}
 }

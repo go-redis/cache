@@ -8,7 +8,7 @@ import (
 	"github.com/go-redis/cache"
 )
 
-func BenchmarkDo(b *testing.B) {
+func BenchmarkOnce(b *testing.B) {
 	codec := newCodec()
 	codec.UseLocalCache(1000, time.Minute)
 
@@ -16,16 +16,18 @@ func BenchmarkDo(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			n, err := codec.Once(&cache.Item{
-				Key: "bench-once",
+			var n int
+			err := codec.Once(&cache.Item{
+				Key:    "bench-once",
+				Object: &n,
 				Func: func() (interface{}, error) {
-					return uint64(42), nil
+					return 42, nil
 				},
 			})
 			if err != nil {
 				panic(err)
 			}
-			if n.(uint64) != 42 {
+			if n != 42 {
 				panic(fmt.Sprintf("%d != 42", n))
 			}
 		}

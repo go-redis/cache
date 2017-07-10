@@ -26,8 +26,8 @@ func perform(n int, cbs ...func(int)) {
 		for i := 0; i < n; i++ {
 			wg.Add(1)
 			go func(cb func(int), i int) {
-				defer GinkgoRecover()
 				defer wg.Done()
+				defer GinkgoRecover()
 
 				cb(i)
 			}(cb, i)
@@ -86,9 +86,10 @@ var _ = Describe("Codec", func() {
 			It("works with Object", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Once(&cache.Item{
+					got := new(Object)
+					err := codec.Once(&cache.Item{
 						Key:    key,
-						Object: new(Object),
+						Object: got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return obj, nil
@@ -103,9 +104,10 @@ var _ = Describe("Codec", func() {
 			It("works with ptr and non-ptr", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Once(&cache.Item{
+					got := new(Object)
+					err := codec.Once(&cache.Item{
 						Key:    key,
-						Object: new(Object),
+						Object: got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return *obj, nil
@@ -117,11 +119,13 @@ var _ = Describe("Codec", func() {
 				Expect(callCount).To(Equal(int64(1)))
 			})
 
-			It("works without Object", func() {
+			It("works with bool", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Once(&cache.Item{
-						Key: key,
+					var got bool
+					err := codec.Once(&cache.Item{
+						Key:    key,
+						Object: &got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return true, nil
@@ -136,7 +140,7 @@ var _ = Describe("Codec", func() {
 			It("works without Object and nil result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Once(&cache.Item{
+					err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
@@ -144,7 +148,6 @@ var _ = Describe("Codec", func() {
 						},
 					})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(got).To(BeNil())
 				})
 				Expect(callCount).To(Equal(int64(1)))
 			})
@@ -152,7 +155,7 @@ var _ = Describe("Codec", func() {
 			It("works without Object and error result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					got, err := codec.Once(&cache.Item{
+					err := codec.Once(&cache.Item{
 						Key: key,
 						Func: func() (interface{}, error) {
 							time.Sleep(100 * time.Millisecond)
@@ -161,7 +164,6 @@ var _ = Describe("Codec", func() {
 						},
 					})
 					Expect(err).To(MatchError("error stub"))
-					Expect(got).To(BeNil())
 				})
 				Expect(callCount).To(Equal(int64(1)))
 			})
@@ -169,8 +171,10 @@ var _ = Describe("Codec", func() {
 			It("does not cache error result", func() {
 				var callCount int64
 				do := func(sleep time.Duration) (int, error) {
-					obj, err := codec.Once(&cache.Item{
-						Key: key,
+					var n int
+					err := codec.Once(&cache.Item{
+						Key:    key,
+						Object: &n,
 						Func: func() (interface{}, error) {
 							time.Sleep(sleep)
 
@@ -178,13 +182,13 @@ var _ = Describe("Codec", func() {
 							if n == 1 {
 								return nil, errors.New("error stub")
 							}
-							return uint64(42), nil
+							return 42, nil
 						},
 					})
 					if err != nil {
 						return 0, err
 					}
-					return int(obj.(int8)), nil
+					return n, nil
 				}
 
 				perform(100, func(int) {
