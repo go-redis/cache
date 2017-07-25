@@ -60,8 +60,12 @@ type Codec struct {
 	Marshal   func(interface{}) ([]byte, error)
 	Unmarshal func([]byte, interface{}) error
 
-	group        singleflight.Group
-	hits, misses int64
+	group singleflight.Group
+
+	hits        uint64
+	misses      uint64
+	localHits   uint64
+	localMisses uint64
 }
 
 // UseLocalCache causes Codec to cache items in local LRU cache.
@@ -125,9 +129,10 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	if cd.localCache != nil {
 		b, ok := cd.localCache.Get(key)
 		if ok {
-			atomic.AddInt64(&cd.hits, 1)
+			atomic.AddUint64(&cd.localHits, 1)
 			return b, nil
 		}
+		atomic.AddUint64(&cd.localMisses, 1)
 	}
 
 	if onlyLocalCache {
@@ -136,13 +141,14 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 
 	b, err := cd.Redis.Get(key).Bytes()
 	if err != nil {
-		atomic.AddInt64(&cd.misses, 1)
+		atomic.AddUint64(&cd.misses, 1)
 		if err == redis.Nil {
 			return nil, ErrCacheMiss
 		}
 		log.Printf("cache: Get key=%q failed: %s", key, err)
 		return nil, err
 	}
+	atomic.AddUint64(&cd.hits, 1)
 
 	if cd.localCache != nil {
 		cd.localCache.Set(key, b)
@@ -230,10 +236,22 @@ func (cd *Codec) Delete(key string) error {
 	return nil
 }
 
-func (cd *Codec) Hits() int {
-	return int(atomic.LoadInt64(&cd.hits))
+type Stats struct {
+	Hits        uint64
+	Misses      uint64
+	LocalHits   uint64
+	LocalMisses uint64
 }
 
-func (cd *Codec) Misses() int {
-	return int(atomic.LoadInt64(&cd.misses))
+// Stats returns cache statistics.
+func (cd *Codec) Stats() *Stats {
+	stats := Stats{
+		Hits:   atomic.LoadUint64(&cd.hits),
+		Misses: atomic.LoadUint64(&cd.misses),
+	}
+	if cd.localCache != nil {
+		stats.LocalHits = atomic.LoadUint64(&cd.localHits)
+		stats.LocalMisses = atomic.LoadUint64(&cd.localMisses)
+	}
+	return &stats
 }
