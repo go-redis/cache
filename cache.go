@@ -102,6 +102,11 @@ func (cd *Codec) set(item *Item) ([]byte, error) {
 	return b, err
 }
 
+// Exists reports whether object for the given key exists.
+func (cd *Codec) Exists(key string) bool {
+	return cd.Get(key, nil) == nil
+}
+
 // Get gets the object for the given key.
 func (cd *Codec) Get(key string, object interface{}) error {
 	return cd.get(key, object, false)
