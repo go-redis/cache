@@ -52,6 +52,8 @@ var _ = Describe("Codec", func() {
 
 			err = codec.Get(key, nil)
 			Expect(err).NotTo(HaveOccurred())
+
+			Expect(codec.Exists(key)).To(BeTrue())
 		})
 
 		It("Deletes key", func() {
@@ -61,11 +63,15 @@ var _ = Describe("Codec", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			Expect(codec.Exists(key)).To(BeTrue())
+
 			err = codec.Delete(key)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = codec.Get(key, nil)
 			Expect(err).To(Equal(cache.ErrCacheMiss))
+
+			Expect(codec.Exists(key)).To(BeFalse())
 		})
 
 		It("Gets and Sets data", func() {
@@ -80,6 +86,8 @@ var _ = Describe("Codec", func() {
 			err = codec.Get(key, wanted)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(wanted).To(Equal(obj))
+
+			Expect(codec.Exists(key)).To(BeTrue())
 		})
 
 		Describe("Do func", func() {
