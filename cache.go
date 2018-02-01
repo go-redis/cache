@@ -95,11 +95,16 @@ func (cd *Codec) set(item *Item) ([]byte, error) {
 		cd.localCache.Set(item.Key, b)
 	}
 
+	if cd.Redis == nil {
+		return b, nil
+	}
+
 	err = cd.Redis.Set(item.Key, b, item.exp()).Err()
 	if err != nil {
 		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
+		return nil, err
 	}
-	return b, err
+	return b, nil
 }
 
 // Exists reports whether object for the given key exists.
@@ -140,7 +145,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		atomic.AddUint64(&cd.localMisses, 1)
 	}
 
-	if onlyLocalCache {
+	if onlyLocalCache || cd.Redis == nil {
 		return nil, ErrCacheMiss
 	}
 
@@ -228,6 +233,10 @@ func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
 func (cd *Codec) Delete(key string) error {
 	if cd.localCache != nil {
 		cd.localCache.Delete(key)
+	}
+
+	if cd.Redis == nil {
+		return nil
 	}
 
 	deleted, err := cd.Redis.Del(key).Result()

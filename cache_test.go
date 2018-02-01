@@ -239,6 +239,16 @@ var _ = Describe("Codec", func() {
 
 		testCodec()
 	})
+
+	Context("with LocalCache and without Redis", func() {
+		BeforeEach(func() {
+			codec = newCodec()
+			codec.UseLocalCache(1000, time.Minute)
+			codec.Redis = nil
+		})
+
+		testCodec()
+	})
 })
 
 func newCodec() *cache.Codec {
