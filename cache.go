@@ -13,6 +13,7 @@ import (
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
+var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -96,6 +97,9 @@ func (cd *Codec) set(item *Item) ([]byte, error) {
 	}
 
 	if cd.Redis == nil {
+		if cd.localCache == nil {
+			return nil, errRedisLocalCacheNil
+		}
 		return b, nil
 	}
 
@@ -145,7 +149,13 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		atomic.AddUint64(&cd.localMisses, 1)
 	}
 
-	if onlyLocalCache || cd.Redis == nil {
+	if onlyLocalCache {
+		return nil, ErrCacheMiss
+	}
+	if cd.Redis == nil {
+		if cd.localCache == nil {
+			return nil, errRedisLocalCacheNil
+		}
 		return nil, ErrCacheMiss
 	}
 
@@ -236,6 +246,9 @@ func (cd *Codec) Delete(key string) error {
 	}
 
 	if cd.Redis == nil {
+		if cd.localCache == nil {
+			return errRedisLocalCacheNil
+		}
 		return nil
 	}
 
