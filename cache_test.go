@@ -15,7 +15,7 @@ import (
 	"github.com/go-redis/cache"
 )
 
-func TestModels(t *testing.T) {
+func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "cache")
 }
@@ -90,7 +90,34 @@ var _ = Describe("Codec", func() {
 			Expect(codec.Exists(key)).To(BeTrue())
 		})
 
-		Describe("Do func", func() {
+		Describe("Once func", func() {
+			It("calls Func when cache fails", func() {
+				err := codec.Set(&cache.Item{
+					Key:    key,
+					Object: "*",
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				var got bool
+				err = codec.Get(key, &got)
+				Expect(err).To(MatchError("msgpack: invalid code=a1 decoding bool"))
+
+				err = codec.Once(&cache.Item{
+					Key:    key,
+					Object: &got,
+					Func: func() (interface{}, error) {
+						return true, nil
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got).To(BeTrue())
+
+				got = false
+				err = codec.Get(key, &got)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got).To(BeTrue())
+			})
+
 			It("works with Object", func() {
 				var callCount int64
 				perform(100, func(int) {
@@ -251,12 +278,16 @@ var _ = Describe("Codec", func() {
 	})
 })
 
-func newCodec() *cache.Codec {
-	ring := redis.NewRing(&redis.RingOptions{
+func newRing() *redis.Ring {
+	return redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
 		},
 	})
+}
+
+func newCodec() *cache.Codec {
+	ring := newRing()
 	_ = ring.ForEachShard(func(client *redis.Client) error {
 		return client.FlushDb().Err()
 	})
