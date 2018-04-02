@@ -131,7 +131,8 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 		return nil
 	}
 
-	if err := cd.Unmarshal(b, object); err != nil {
+	err = cd.Unmarshal(b, object)
+	if err != nil {
 		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", key, object, err)
 		return err
 	}
@@ -182,7 +183,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Once(item *Item) error {
-	b, err := cd.getItemBytesOnce(item)
+	b, cached, err := cd.getItemBytesOnce(item)
 	if err != nil {
 		return err
 	}
@@ -194,23 +195,29 @@ func (cd *Codec) Once(item *Item) error {
 	err = cd.Unmarshal(b, item.Object)
 	if err != nil {
 		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
-		return err
+		if cached {
+			_ = cd.Delete(item.Key)
+			return cd.Once(item)
+		} else {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (cd *Codec) getItemBytesOnce(item *Item) ([]byte, error) {
+func (cd *Codec) getItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
 	if cd.localCache != nil {
 		b, err := cd.getItemBytesFast(item)
 		if err == nil {
-			return b, nil
+			return b, true, nil
 		}
 	}
 
 	obj, err := cd.group.Do(item.Key, func() (interface{}, error) {
 		b, err := cd.getItemBytes(item)
 		if err == nil {
+			cached = true
 			return b, nil
 		}
 
@@ -227,9 +234,9 @@ func (cd *Codec) getItemBytesOnce(item *Item) ([]byte, error) {
 		return b, err
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return obj.([]byte), nil
+	return obj.([]byte), cached, nil
 }
 
 func (cd *Codec) getItemBytes(item *Item) ([]byte, error) {
