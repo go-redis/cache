@@ -2,6 +2,7 @@ package cache_test
 
 import (
 	"errors"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -114,6 +115,35 @@ var _ = Describe("Codec", func() {
 
 				got = false
 				err = codec.Get(key, &got)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(got).To(BeTrue())
+			})
+
+			It("does not cache when Func fails", func() {
+				perform(100, func(int) {
+					var got bool
+					err := codec.Once(&cache.Item{
+						Key:    key,
+						Object: &got,
+						Func: func() (interface{}, error) {
+							return nil, io.EOF
+						},
+					})
+					Expect(err).To(Equal(io.EOF))
+					Expect(got).To(BeFalse())
+				})
+
+				var got bool
+				err := codec.Get(key, &got)
+				Expect(err).To(Equal(cache.ErrCacheMiss))
+
+				err = codec.Once(&cache.Item{
+					Key:    key,
+					Object: &got,
+					Func: func() (interface{}, error) {
+						return true, nil
+					},
+				})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(BeTrue())
 			})

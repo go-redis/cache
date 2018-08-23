@@ -1,8 +1,13 @@
-# Redis cache library for Golang [![Build Status](https://travis-ci.org/go-redis/cache.svg?branch=v3)](https://travis-ci.org/go-redis/cache)
+# Redis cache library for Golang
+
+[![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
+[![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://godoc.org/github.com/go-redis/cache)
 
 ## Installation
 
-    go get github.com/go-redis/cache
+```shell
+go get -u github.com/go-redis/cache
+```
 
 ## Quickstart
 
