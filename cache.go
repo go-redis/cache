@@ -76,11 +76,11 @@ func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
-	_, err := cd.set(item)
+	_, err := cd.setItem(item)
 	return err
 }
 
-func (cd *Codec) set(item *Item) ([]byte, error) {
+func (cd *Codec) setItem(item *Item) ([]byte, error) {
 	object, err := item.object()
 	if err != nil {
 		return nil, err
@@ -106,9 +106,8 @@ func (cd *Codec) set(item *Item) ([]byte, error) {
 	err = cd.Redis.Set(item.Key, b, item.exp()).Err()
 	if err != nil {
 		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
-		return nil, err
 	}
-	return b, nil
+	return b, err
 }
 
 // Exists reports whether object for the given key exists.
@@ -183,7 +182,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Once(item *Item) error {
-	b, cached, err := cd.getItemBytesOnce(item)
+	b, cached, err := cd.getSetItemBytesOnce(item)
 	if err != nil {
 		return err
 	}
@@ -206,7 +205,7 @@ func (cd *Codec) Once(item *Item) error {
 	return nil
 }
 
-func (cd *Codec) getItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
+func (cd *Codec) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
 	if cd.localCache != nil {
 		b, err := cd.getItemBytesFast(item)
 		if err == nil {
@@ -226,12 +225,16 @@ func (cd *Codec) getItemBytesOnce(item *Item) (b []byte, cached bool, err error)
 			return nil, err
 		}
 
-		b, err = cd.set(&Item{
+		b, err = cd.setItem(&Item{
 			Key:        item.Key,
 			Object:     obj,
 			Expiration: item.Expiration,
 		})
-		return b, err
+		if b != nil {
+			// Ignore error if we have the result.
+			return b, nil
+		}
+		return nil, err
 	})
 	if err != nil {
 		return nil, false, err
