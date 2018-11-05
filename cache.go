@@ -71,7 +71,8 @@ type Codec struct {
 	localMisses uint64
 }
 
-// UseLocalCache causes Codec to cache marshalled bytes of items in local LRU cache.
+// UseLocalCache causes Codec to cache marshalled bytes of items
+// in local LRU cache.
 func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 	cd.localCache = lrucache.New(maxLen, expiration)
 }
