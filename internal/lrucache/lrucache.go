@@ -8,7 +8,7 @@ import (
 
 type entry struct {
 	key     string
-	value   []byte
+	value   interface{}
 	addedAt time.Time
 }
 
@@ -32,11 +32,11 @@ func New(maxLen int, expiration time.Duration) *Cache {
 	}
 }
 
-func (c *Cache) Get(key string) ([]byte, bool) {
+func (c *Cache) Get(key string) (interface{}, bool) {
 	return c.get(key)
 }
 
-func (c *Cache) get(key string) ([]byte, bool) {
+func (c *Cache) get(key string) (interface{}, bool) {
 	c.mu.Lock()
 
 	el := c.table[key]
@@ -58,7 +58,7 @@ func (c *Cache) get(key string) ([]byte, bool) {
 	return value, true
 }
 
-func (c *Cache) Set(key string, value []byte) {
+func (c *Cache) Set(key string, value interface{}) {
 	c.mu.Lock()
 	if el := c.table[key]; el != nil {
 		entry := el.Value.(*entry)
@@ -95,7 +95,7 @@ func (c *Cache) Flush() error {
 	return nil
 }
 
-func (c *Cache) addNew(key string, value []byte) {
+func (c *Cache) addNew(key string, value interface{}) {
 	newEntry := &entry{
 		key:     key,
 		value:   value,

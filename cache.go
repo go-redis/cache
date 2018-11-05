@@ -14,6 +14,7 @@ import (
 
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+var errObjectCacheNotEnabled = errors.New("cache: LocalCache is not enabled or not initialized with UseLocalObjectCache")
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -54,7 +55,8 @@ func (item *Item) exp() time.Duration {
 }
 
 type Codec struct {
-	Redis rediser
+	Redis       rediser
+	cacheObject bool
 
 	localCache *lrucache.Cache
 
@@ -69,12 +71,19 @@ type Codec struct {
 	localMisses uint64
 }
 
-// UseLocalCache causes Codec to cache items in local LRU cache.
+// UseLocalCache causes Codec to cache marshalled bytes of items in local LRU cache.
 func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 	cd.localCache = lrucache.New(maxLen, expiration)
 }
 
-// Set caches the item.
+// UseLocalObjectCache causes Code to cache objects in local LRU cache.
+// Immutability of cache items should be guaranteed by user
+func (cd *Codec) UseLocalObjectCache(maxLen int, expiration time.Duration) {
+	cd.UseLocalCache(maxLen, expiration)
+	cd.cacheObject = true
+}
+
+// Set caches the item. item.Object should be a pointer
 func (cd *Codec) Set(item *Item) error {
 	_, err := cd.setItem(item)
 	return err
@@ -86,13 +95,17 @@ func (cd *Codec) setItem(item *Item) ([]byte, error) {
 		return nil, err
 	}
 
+	if cd.cacheObject {
+		cd.localCache.Set(item.Key, object)
+	}
+
 	b, err := cd.Marshal(object)
 	if err != nil {
 		log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
 		return nil, err
 	}
 
-	if cd.localCache != nil {
+	if !cd.cacheObject && cd.localCache != nil {
 		cd.localCache.Set(item.Key, b)
 	}
 
@@ -112,7 +125,64 @@ func (cd *Codec) setItem(item *Item) ([]byte, error) {
 
 // Exists reports whether object for the given key exists.
 func (cd *Codec) Exists(key string) bool {
+	if cd.cacheObject {
+		_, err := cd.GetObject(key)
+		return err == nil
+	}
 	return cd.Get(key, nil) == nil
+}
+
+// GetObject returns a pointer to the cache object for the given key
+// Only used when local cache is initialized by UseLocalObjectCache
+func (cd *Codec) GetObject(key string) (interface{}, error) {
+	if cd.cacheObject {
+		return cd.getItemObject(key)
+	}
+	return nil, errObjectCacheNotEnabled
+}
+
+func (cd *Codec) getItemObjectFast(key string) (interface{}, error) {
+	item, ok := cd.localCache.Get(key)
+	if ok {
+		atomic.AddUint64(&cd.localHits, 1)
+		return item, nil
+	}
+	return nil, ErrCacheMiss
+}
+
+func (cd *Codec) getItemObjectReal(key string) (interface{}, error) {
+	if cd.Redis == nil {
+		return nil, ErrCacheMiss
+	}
+
+	b, err := cd.Redis.Get(key).Bytes()
+	if err != nil {
+		atomic.AddUint64(&cd.misses, 1)
+		if err == redis.Nil {
+			return nil, ErrCacheMiss
+		}
+		log.Printf("cache: Get key=%q failed: %s", key, err)
+		return nil, err
+	}
+	atomic.AddUint64(&cd.hits, 1)
+
+	var wanted interface{}
+	err = cd.Unmarshal(b, &wanted)
+	if err != nil {
+		log.Printf("cache: key=%q Unmarshal failed: %s", key, err)
+		return nil, err
+	}
+
+	cd.localCache.Set(key, wanted)
+	return &wanted, nil
+}
+
+func (cd *Codec) getItemObject(key string) (interface{}, error) {
+	object, err := cd.getItemObjectFast(key)
+	if err == nil {
+		return object, nil
+	}
+	return cd.getItemObjectReal(key)
 }
 
 // Get gets the object for the given key.
@@ -144,7 +214,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		b, ok := cd.localCache.Get(key)
 		if ok {
 			atomic.AddUint64(&cd.localHits, 1)
-			return b, nil
+			return b.([]byte), nil
 		}
 		atomic.AddUint64(&cd.localMisses, 1)
 	}
@@ -203,6 +273,46 @@ func (cd *Codec) Once(item *Item) error {
 	}
 
 	return nil
+}
+
+// ObjectOnce gets the item.Object for the given item.Key from the cache
+// (without unmarshalling) or executes, caches, and returns the results
+// of the given item.Func, making sure that only one execution is in-flight
+// for a given item.Key at a time. If a duplicate comes in, the duplicate
+// caller waits for the original to complete and receives the same results.
+func (cd *Codec) ObjectOnce(item *Item) (object interface{}, err error) {
+	if cd.localCache == nil || !cd.cacheObject {
+		return nil, errObjectCacheNotEnabled
+	}
+
+	object, err = cd.getItemObjectFast(item.Key)
+	if err == nil {
+		return object, err
+	}
+
+	obj, err := cd.group.Do(item.Key, func() (interface{}, error) {
+		object, err := cd.getItemObjectReal(item.Key)
+		if err == nil {
+			return object, err
+		}
+
+		obj, err := item.Func()
+		if err != nil {
+			return nil, err
+		}
+
+		b, err := cd.setItem(&Item{
+			Key:        item.Key,
+			Object:     obj,
+			Expiration: item.Expiration,
+		})
+		if b != nil {
+			// Ignore error if we have the result.
+			return obj, nil
+		}
+		return nil, err
+	})
+	return obj, err
 }
 
 func (cd *Codec) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
