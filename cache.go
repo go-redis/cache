@@ -55,7 +55,6 @@ func (item *Item) exp() time.Duration {
 	return item.Expiration
 }
 
-
 type Codec struct {
 	Redis rediser
 
@@ -73,7 +72,10 @@ type Codec struct {
 	localMisses uint64
 }
 
-func NewCodec(ring *redis.Ring, marshal func(interface{}) ([]byte, error), unmarshal func([]byte, interface{}) error) *Codec {
+func NewCodec(ring *redis.Ring,
+	marshal func(interface{}) ([]byte, error),
+	unmarshal func([]byte, interface{}) error) *Codec {
+
 	codec := &Codec{
 		Redis:     ring,
 		chans:     singleget.Chans{M: make(map[string]chan uint8)},
