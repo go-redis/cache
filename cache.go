@@ -10,10 +10,13 @@ import (
 
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
+	"github.com/go-redis/cache/internal/singleget"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+
+var MaxRetryNum = uint8(2)
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -140,6 +143,12 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 }
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
+	ch, getting := singleget.GetChan(key)
+	if getting {
+		<-ch
+		onlyLocalCache = true
+	}
+
 	if cd.localCache != nil {
 		b, ok := cd.localCache.Get(key)
 		if ok {
@@ -159,7 +168,15 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
-	b, err := cd.Redis.Get(key).Bytes()
+	//Because onlyLocalCache == false ; So getting==false
+	ch = make(chan uint8)
+	singleget.SetChan(key, ch)
+
+	b, err := cd.redisGetBytes(key, MaxRetryNum)
+
+	singleget.DeleteChan(key)
+	close(ch) //notify channel to stop waiting
+
 	if err != nil {
 		atomic.AddUint64(&cd.misses, 1)
 		if err == redis.Nil {
@@ -174,6 +191,17 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		cd.localCache.Set(key, b)
 	}
 	return b, nil
+}
+
+func (cd *Codec) redisGetBytes(key string, retry uint8) ([]byte, error) {
+	b, err := cd.Redis.Get(key).Bytes()
+	if err != nil {
+		retry--
+		if retry > 0 {
+			return cd.redisGetBytes(key, retry)
+		}
+	}
+	return b, err
 }
 
 // Once gets the item.Object for the given item.Key from the cache or
