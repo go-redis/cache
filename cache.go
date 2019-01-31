@@ -55,6 +55,7 @@ func (item *Item) exp() time.Duration {
 	return item.Expiration
 }
 
+
 type Codec struct {
 	Redis rediser
 
@@ -64,11 +65,22 @@ type Codec struct {
 	Unmarshal func([]byte, interface{}) error
 
 	group singleflight.Group
+	chans singleget.Chans
 
 	hits        uint64
 	misses      uint64
 	localHits   uint64
 	localMisses uint64
+}
+
+func NewCodec(ring *redis.Ring, marshal func(interface{}) ([]byte, error), unmarshal func([]byte, interface{}) error) *Codec {
+	codec := &Codec{
+		Redis:     ring,
+		chans:     singleget.Chans{M: make(map[string]chan uint8)},
+		Marshal:   marshal,
+		Unmarshal: unmarshal,
+	}
+	return codec
 }
 
 // UseLocalCache causes Codec to cache items in local LRU cache.
@@ -142,9 +154,9 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 }
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
-	ch, getting := singleget.GetChan(key)
+	ch, getting := cd.chans.GetChan(key)
 	if getting {
-		<-ch  //Waiting for one GetBytes successfully.
+		<-ch //Waiting for one GetBytes successfully.
 		onlyLocalCache = true
 	}
 
@@ -170,11 +182,11 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	//If onlyLocalCache == true, it will return in above code.
 	//Because onlyLocalCache == false ; So getting==false. We new a channel which represents the status of getting or not.
 	ch = make(chan uint8)
-	singleget.SetChan(key, ch)
+	cd.chans.SetChan(key, ch)
 
 	b, err := cd.redisGetBytes(key, MaxRetryNum)
 	defer func() {
-		singleget.DeleteChan(key)
+		cd.chans.DeleteChan(key)
 		close(ch) //Notify channel to stop waiting
 	}()
 

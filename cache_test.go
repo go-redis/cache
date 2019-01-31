@@ -322,14 +322,12 @@ func newCodec() *cache.Codec {
 		return client.FlushDb().Err()
 	})
 
-	return &cache.Codec{
-		Redis: ring,
-
-		Marshal: func(v interface{}) ([]byte, error) {
+	return cache.NewCodec(ring,
+		func(v interface{}) ([]byte, error) {
 			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
+		}, func(b []byte, v interface{}) error {
 			return msgpack.Unmarshal(b, v)
-		},
-	}
+		})
+
+
 }

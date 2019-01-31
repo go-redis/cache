@@ -23,16 +23,13 @@ func Example_basicUsage() {
 		},
 	})
 
-	codec := &cache.Codec{
-		Redis: ring,
-
-		Marshal: func(v interface{}) ([]byte, error) {
+	codec := cache.NewCodec(ring,
+		func(v interface{}) ([]byte, error) {
 			return msgpack.Marshal(v)
 		},
-		Unmarshal: func(b []byte, v interface{}) error {
+		func(b []byte, v interface{}) error {
 			return msgpack.Unmarshal(b, v)
-		},
-	}
+		})
 
 	key := "mykey"
 	obj := &Object{
@@ -62,16 +59,13 @@ func Example_advancedUsage() {
 		},
 	})
 
-	codec := &cache.Codec{
-		Redis: ring,
-
-		Marshal: func(v interface{}) ([]byte, error) {
+	codec := cache.NewCodec(ring,
+		func(v interface{}) ([]byte, error) {
 			return msgpack.Marshal(v)
 		},
-		Unmarshal: func(b []byte, v interface{}) error {
+		func(b []byte, v interface{}) error {
 			return msgpack.Unmarshal(b, v)
-		},
-	}
+		})
 
 	obj := new(Object)
 	err := codec.Once(&cache.Item{

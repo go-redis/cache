@@ -2,30 +2,29 @@ package singleget
 
 import "sync"
 
-var refreshMutex sync.Mutex
-var refresh map[string]chan uint8
-
-func init() {
-	refreshMutex = sync.Mutex{}
-	refresh = make(map[string]chan uint8)
+// Group represents a class of work and forms a namespace in which
+// units of work can be executed with duplicate suppression.
+type Chans struct {
+	sync.Mutex       // protects m
+	M  map[string]chan uint8 // lazily initialized
 }
 
-func GetChan(key string) (chan uint8, bool) {
-	refreshMutex.Lock()
-	defer refreshMutex.Unlock()
-	ch, refreshing := refresh[key]
+func (chs *Chans)GetChan(key string) (chan uint8, bool) {
+	chs.Lock()
+	defer chs.Unlock()
+	ch, refreshing := chs.M[key]
 
 	return ch, refreshing
 }
 
-func SetChan(key string, ch chan uint8) {
-	refreshMutex.Lock()
-	defer refreshMutex.Unlock()
-	refresh[key] = ch
+func  (chs *Chans)SetChan(key string, ch chan uint8) {
+	chs.Lock()
+	defer chs.Unlock()
+	chs.M[key] = ch
 }
 
-func DeleteChan(key string) {
-	refreshMutex.Lock()
-	defer refreshMutex.Unlock()
-	delete(refresh, key)
+func  (chs *Chans)DeleteChan(key string) {
+	chs.Lock()
+	defer chs.Unlock()
+	delete(chs.M, key)
 }
