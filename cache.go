@@ -15,7 +15,6 @@ import (
 
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
-
 var MaxRetryNum = uint8(2)
 
 type rediser interface {
@@ -145,7 +144,7 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	ch, getting := singleget.GetChan(key)
 	if getting {
-		<-ch
+		<-ch  //Waiting for one GetBytes successfully.
 		onlyLocalCache = true
 	}
 
@@ -168,14 +167,16 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
-	//Because onlyLocalCache == false ; So getting==false
+	//If onlyLocalCache == true, it will return in above code.
+	//Because onlyLocalCache == false ; So getting==false. We new a channel which represents the status of getting or not.
 	ch = make(chan uint8)
 	singleget.SetChan(key, ch)
 
 	b, err := cd.redisGetBytes(key, MaxRetryNum)
-
-	singleget.DeleteChan(key)
-	close(ch) //notify channel to stop waiting
+	defer func() {
+		singleget.DeleteChan(key)
+		close(ch) //Notify channel to stop waiting
+	}()
 
 	if err != nil {
 		atomic.AddUint64(&cd.misses, 1)
