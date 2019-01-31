@@ -11,7 +11,6 @@ import (
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
 	"github.com/go-redis/cache/internal/singleget"
-	"sync"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -184,29 +183,19 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 
 	//If onlyLocalCache == true, it will return in above code.
 	//Because onlyLocalCache == false ; So getting==false. We new a channel which represents the status of getting or not.
-	ch = make(chan uint8,MaxGetNum-1)
+	ch = make(chan uint8, MaxGetNum-1)  // MaxGetNum-1>=0
 	cd.chans.SetChan(key, ch)
 
-	closing:=sync.Mutex{}
-
-	go func() {
-		//Allow MaxGetNum ch doesn't need to wait.
-		for i:=uint8(0);i< MaxGetNum-1;i++  {
-			closing.Lock()
-			if ch!=nil {
-				ch<-uint8(1)
-			}
-			closing.Unlock()
-		}
-	}()
+	//MaxGetNum goroutine doesn't need to wait.
+	for i := uint8(0); i < MaxGetNum-1; i++ {
+		ch <- uint8(1)
+	}
 
 	b, err := cd.Redis.Get(key).Bytes()
 	defer func() {
 		cd.chans.DeleteChan(key)
-		closing.Lock()
 		close(ch) //Notify channel to stop waiting
-		ch=nil
-		closing.Unlock()
+		ch = nil
 	}()
 
 	if err != nil {
