@@ -3,9 +3,10 @@ package singleget
 import "sync"
 
 // Chans is designed save map[key]channel.
-// It makes sure that only one getBytes is in-flight for a given key at a
-// time. If a duplicate comes in, the duplicate caller waits for the
-// original to complete and receives the same results.
+// It makes sure that only two getBytes goroutine is in-flight for a given key at a
+// time. If a new one comes in, the duplicate caller waits for the
+// old one to complete and receives the same results.
+// Of course MaxGetNum can be modified easily in cache.go
 type Chans struct {
 	sync.Mutex       // protects m
 	M  map[string]chan uint8
