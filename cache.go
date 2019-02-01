@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
-	"github.com/go-redis/cache/internal/singleget"
+ 	"github.com/go-redis/cache/internal/limitget"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -64,7 +64,7 @@ type Codec struct {
 	Unmarshal func([]byte, interface{}) error
 
 	group singleflight.Group
-	chans singleget.Chans
+	chans limitget.Chans
 
 	hits        uint64
 	misses      uint64
@@ -78,7 +78,7 @@ func NewCodec(ring *redis.Ring,
 
 	codec := &Codec{
 		Redis:     ring,
-		chans:     singleget.Chans{M: make(map[string]chan uint8)},
+		chans:     limitget.Chans{M: make(map[string]chan uint8)},
 		Marshal:   marshal,
 		Unmarshal: unmarshal,
 	}
@@ -157,9 +157,11 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	ch, getting := cd.chans.GetChan(key)
-	if getting {
-		<-ch //Waiting for one GetBytes successfully.
-		onlyLocalCache = true
+ 	if getting {
+		_, live :=<-ch //Waiting for one GetBytes successfully.
+		if !live {    //live==false means ch existed but closed. live==true means receiving uint8(1).
+			onlyLocalCache = true
+		}
 	}
 
 	if cd.localCache != nil {
@@ -181,10 +183,11 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
-	//If onlyLocalCache == true, it will return in above code.
-	//Because onlyLocalCache == false ; So getting==false. We new a channel which represents the status of getting or not.
-	ch = make(chan uint8, MaxGetNum-1)  // MaxGetNum-1>=0
-	cd.chans.SetChan(key, ch)
+	if !getting {
+		// We new a channel which represents the status of getting or not.
+		ch = make(chan uint8, MaxGetNum-1)  // MaxGetNum-1>=0
+		cd.chans.SetChan(key, ch)
+	}
 
 	//MaxGetNum goroutine doesn't need to wait.
 	for i := uint8(0); i < MaxGetNum-1; i++ {

@@ -1,9 +1,10 @@
-package singleget
+package limitget
 
 import "sync"
 
-// Chans is designed save map[key]channel.
-// It makes sure that only two getBytes goroutine is in-flight for a given key at a
+// limitget is designed limit the number of Redis.Get with same key at a time.
+// The number could be any value above 0. But it's const number.It shouldn't be too big.
+// It makes sure that only MaxGetNum Redis.Get is in-flight for a given key at a
 // time. If a new one comes in, the duplicate caller waits for the
 // old one to complete and receives the same results.
 // Of course MaxGetNum can be modified easily in cache.go
