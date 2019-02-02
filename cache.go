@@ -15,7 +15,6 @@ import (
 
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
-var MaxGetNum = uint8(2)
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -184,20 +183,12 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	}
 
 	if !getting {
-		// We new a channel which represents the status of getting or not.
-		ch = make(chan uint8, MaxGetNum-1)  // MaxGetNum-1>=0
-		cd.chans.SetChan(key, ch)
-	}
-
-	//MaxGetNum goroutine doesn't need to wait.
-	for i := uint8(0); i < MaxGetNum-1; i++ {
-		ch <- uint8(1)
+		cd.chans.SetChan(key)
 	}
 
 	b, err := cd.Redis.Get(key).Bytes()
 	defer func() {
 		cd.chans.DeleteChan(key)
-		close(ch) //Notify channel to stop waiting
 		ch = nil
 	}()
 
