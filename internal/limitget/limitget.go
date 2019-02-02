@@ -46,10 +46,12 @@ func (chs *Chans) SetChan(key string) {
 func (chs *Chans) DeleteChan(key string) {
 	chs.Lock()
 	defer chs.Unlock()
-	ch, _ := chs.GetChan(key)
+	ch, ok := chs.GetChan(key)
+	if !ok {
+		return
+	}
 
 	delete(chs.M, key)
-	<-chs.maxConCh
-
 	close(ch) //Notify channel to stop waiting
+	<-chs.maxConCh
 }
