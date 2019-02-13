@@ -46,7 +46,7 @@ func (chs *Chans) SetChan(key string) {
 func (chs *Chans) DeleteChan(key string) {
 	chs.Lock()
 	defer chs.Unlock()
-	ch, ok := chs.GetChan(key)
+	ch, ok := chs.M[key]
 	if !ok {
 		return
 	}
