@@ -2,7 +2,9 @@ package cache_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -75,6 +77,35 @@ var _ = Describe("Codec", func() {
 			Expect(codec.Exists(key)).To(BeFalse())
 		})
 
+		It("Deletes several keys", func() {
+			items := []*cache.Item{}
+			keys := []string{}
+			for i := 0; i < 10; i++ {
+				k := fmt.Sprintf("key-to-delete-%d", i)
+				items = append(items, &cache.Item{
+					Key: k,
+					Object: "data",
+				})
+				keys = append(keys, k)
+			}
+			err := codec.Set(items ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, item := range items {
+				Expect(codec.Exists(item.Key)).To(BeTrue())
+			}
+
+
+			err = codec.Delete(keys ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, item := range items {
+				err = codec.Get(item.Key, nil)
+				Expect(err).To(Equal(cache.ErrCacheMiss))
+				Expect(codec.Exists(item.Key)).To(BeFalse())
+			}
+		})
+
 		It("Gets and Sets data", func() {
 			err := codec.Set(&cache.Item{
 				Key:        key,
@@ -89,6 +120,137 @@ var _ = Describe("Codec", func() {
 			Expect(wanted).To(Equal(obj))
 
 			Expect(codec.Exists(key)).To(BeTrue())
+		})
+
+		It("Gets and Sets multiple data", func() {
+			objects := []*Object{}
+			for i := 0; i < 10; i++ {
+				objects = append(objects, &Object{
+					Str: fmt.Sprintf("set-get-%d", i),
+					Num: i,
+				})
+			}
+
+			for _, obj := range objects {
+				err := codec.Set(&cache.Item{
+					Key:        obj.Str,
+					Object:     obj,
+					Expiration: time.Hour,
+				})
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			for _, obj := range objects {
+				wanted := new(Object)
+				err := codec.Get(obj.Str, wanted)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(wanted).To(Equal(obj))
+
+				Expect(codec.Exists(obj.Str)).To(BeTrue())
+			}
+		})
+
+		It("Sets and MGets data", func() {
+			dataToCache := map[string]*Object{}
+			keys := []string{}
+			for i := 0; i <= 10; i++ {
+				key := fmt.Sprintf("mget-key-%d", i)
+				keys = append(keys, key)
+				dataToCache[key] = &Object{
+					Str: fmt.Sprintf("mget-obj-%d", i),
+					Num: i,
+				}
+			}
+			for k, d := range dataToCache {
+				err := codec.Set(&cache.Item{
+					Key:        k,
+					Object:     d,
+					Expiration: time.Hour,
+				})
+				Expect(err).NotTo(HaveOccurred())
+				//time.Sleep(5 * time.Second)
+			}
+
+			dstMap := map[string]*Object{}
+			keysToLoad := []string{}
+			keysToLoad = append(keysToLoad, keys ...)
+			keysToLoad = append(keysToLoad, "absent-key", "non-exists-key")
+			rand.Shuffle(len(keysToLoad), func(i, j int) {
+				tmp := keysToLoad[i]
+				keysToLoad[i] = keysToLoad[j]
+				keysToLoad[j] = tmp
+			})
+			err := codec.MGet(dstMap, keys ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(dstMap).To(Equal(dataToCache))
+
+			for _, k := range keys {
+				Expect(codec.Exists(k)).To(BeTrue())
+			}
+		})
+
+		It("MGetAndCache data", func() {
+			keys := []string{}
+			availableObjects := map[string]*Object{}
+			for i := 0; i < 10; i ++ {
+				key := fmt.Sprintf("mget-n-cache-%d", i)
+				keys = append(keys, key)
+				availableObjects[key] = &Object{
+					Str: fmt.Sprintf("mget-n-cache-obj-%d", i),
+					Num: i,
+				}
+			}
+			mItem := &cache.MGetArgs{
+				Keys: keys,
+				Dst:  map[string]*Object{},
+				ObjByCacheKeyLoader: func(keysToLoad []string) (map[string]interface{}, error) {
+					m := map[string]interface{}{}
+					for _, k := range keysToLoad {
+						m[k] = availableObjects[k]
+					}
+					return m, nil
+				},
+			}
+			err := codec.MGetAndCache(mItem)
+			Expect(err).NotTo(HaveOccurred())
+
+			mGetMap := map[string]*Object{}
+			err = codec.MGet(mGetMap, keys ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(mItem.Dst).To(Equal(availableObjects))
+			Expect(mItem.Dst).To(Equal(mGetMap))
+		})
+
+		It("MSet data", func() {
+			keys := []string{}
+			availableObjects := map[string]*Object{}
+			for i := 0; i < 10; i ++ {
+				key := fmt.Sprintf("mset-key-%d", i)
+				keys = append(keys, key)
+				availableObjects[key] = &Object{
+					Str: fmt.Sprintf("mset-obj-%d", i),
+					Num: i,
+				}
+			}
+
+			items := []*cache.Item{}
+			for k, v := range availableObjects {
+				items = append(items, &cache.Item{
+					Key:    k,
+					Object: v,
+				})
+			}
+
+			err := codec.Set(items ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			mGetMap := map[string]*Object{}
+			err = codec.MGet(mGetMap, keys ...)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(availableObjects).To(Equal(mGetMap))
 		})
 
 		Describe("Once func", func() {
@@ -312,6 +474,7 @@ func newRing() *redis.Ring {
 	return redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
+			"server2": ":6380",
 		},
 	})
 }
