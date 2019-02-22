@@ -1,6 +1,6 @@
 package limitget
 
-// The module is designed for getting data from database.
+// The module is designed for limiting concurrency of getting data from database.
 // limitget is designed limit the number of Get
 
 import "sync"
