@@ -1,16 +1,17 @@
 package limitget
 
-// limitget is designed limit the number of Redis.Get.
+// The module is designed for getting data from database.
+// limitget is designed limit the number of Get
 
 import "sync"
 
-// MaxConcurrency represents the total number of Redis.Get with all kinds of key.
+// MaxConcurrency represents the total number of Get with all kinds of key.
 var MaxConcurrency = 1000
 
 type Chans struct {
 	sync.Mutex // protects m
 	M          map[string]bool
-	maxConCh   chan uint8 //The channel is used for control the max concurrency number of Redis.Get
+	maxConCh   chan uint8 //The channel is used for control the max concurrency number of get data from database
 }
 
 func (chs *Chans) LimitGet(key string) {
