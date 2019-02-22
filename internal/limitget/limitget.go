@@ -9,19 +9,21 @@ var MaxConcurrency = 1000
 
 type Chans struct {
 	sync.Mutex // protects m
-	M          map[string]chan uint8
+	M          map[string]bool
 	maxConCh   chan uint8 //The channel is used for control the max concurrency number of Redis.Get
 }
 
-func (chs *Chans) GetChan(key string) (chan uint8, bool) {
+func (chs *Chans) LimitGet(key string) {
 	chs.Lock()
-	defer chs.Unlock()
-	ch, refreshing := chs.M[key]
+	_, ok := chs.M[key]
+	chs.Unlock()
 
-	return ch, refreshing
+	if !ok {
+		chs.set(key)
+	}
 }
 
-func (chs *Chans) SetChan(key string) {
+func (chs *Chans) set(key string) {
 	chs.Lock()
 	if chs.maxConCh == nil {
 		chs.maxConCh = make(chan uint8, MaxConcurrency)
@@ -30,23 +32,19 @@ func (chs *Chans) SetChan(key string) {
 
 	chs.maxConCh <- uint8(1)
 
-	// We new a channel which represents the status of getting or not.
-	ch := make(chan uint8)
-
 	chs.Lock()
-	chs.M[key] = ch
+	chs.M[key] = true
 	chs.Unlock()
 }
 
-func (chs *Chans) DeleteChan(key string) {
+func (chs *Chans) ReleaseGet(key string) {
 	chs.Lock()
 	defer chs.Unlock()
-	ch, ok := chs.M[key]
+	_, ok := chs.M[key]
 	if !ok {
 		return
 	}
 
 	delete(chs.M, key)
-	close(ch) //Notify channel to stop waiting
 	<-chs.maxConCh
 }

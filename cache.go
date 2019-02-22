@@ -77,7 +77,7 @@ func NewCodec(ring *redis.Ring,
 
 	codec := &Codec{
 		Redis:     ring,
-		chans:     limitget.Chans{M: make(map[string]chan uint8)},
+		chans:     limitget.Chans{M: make(map[string]bool)},
 		Marshal:   marshal,
 		Unmarshal: unmarshal,
 	}
@@ -174,15 +174,11 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
-	_, getting := cd.chans.GetOrSetChan(key)
-	if !getting {
-		cd.chans.SetChan(key)
-	}
+	cd.chans.LimitGet(key)
 	defer func() {
-		cd.chans.DeleteChan(key)
+		cd.chans.ReleaseGet(key)
 	}()
-
-	//If data expires or doesn't exist, get data from database.
+	//if data expires, we need refresh data . At that time, the time cost may be long enough
 	b, err := cd.Redis.Get(key).Bytes()
 
 	if err != nil {
