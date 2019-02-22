@@ -155,14 +155,6 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 }
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
-	ch, getting := cd.chans.GetChan(key)
-	if getting {
-		_, live := <-ch //Waiting for one GetBytes successfully.
-		if !live {      //live==false means ch existed but closed. live==true means receiving uint8(1).
-			onlyLocalCache = true
-		}
-	}
-
 	if cd.localCache != nil {
 		b, ok := cd.localCache.Get(key)
 		if ok {
@@ -182,16 +174,16 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		return nil, ErrCacheMiss
 	}
 
+	_, getting := cd.chans.GetOrSetChan(key)
 	if !getting {
 		cd.chans.SetChan(key)
 	}
-
-	b, err := cd.Redis.Get(key).Bytes()
-	//If data expires or doesn't exist, get data from database.
 	defer func() {
 		cd.chans.DeleteChan(key)
-		ch = nil
 	}()
+
+	//If data expires or doesn't exist, get data from database.
+	b, err := cd.Redis.Get(key).Bytes()
 
 	if err != nil {
 		atomic.AddUint64(&cd.misses, 1)
