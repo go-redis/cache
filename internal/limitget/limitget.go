@@ -10,10 +10,10 @@ type Chans struct {
 	maxConCh chan uint8 //The channel is used for control the max concurrency number of get data from database
 }
 
-func (chs *Chans) LimitGet(key string) {
+func (chs *Chans) LimitGet() {
 	chs.maxConCh <- uint8(1)
 }
 
-func (chs *Chans) ReleaseGet(key string) {
+func (chs *Chans) ReleaseGet() {
 	<-chs.maxConCh
 }
