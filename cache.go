@@ -8,9 +8,9 @@ import (
 
 	"github.com/go-redis/redis"
 
+	"github.com/go-redis/cache/internal/limitget"
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
- 	"github.com/go-redis/cache/internal/limitget"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -156,9 +156,9 @@ func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error 
 
 func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	ch, getting := cd.chans.GetChan(key)
- 	if getting {
-		_, live :=<-ch //Waiting for one GetBytes successfully.
-		if !live {    //live==false means ch existed but closed. live==true means receiving uint8(1).
+	if getting {
+		_, live := <-ch //Waiting for one GetBytes successfully.
+		if !live {      //live==false means ch existed but closed. live==true means receiving uint8(1).
 			onlyLocalCache = true
 		}
 	}
@@ -187,6 +187,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 	}
 
 	b, err := cd.Redis.Get(key).Bytes()
+	//If data expires or doesn't exist, get data from database.
 	defer func() {
 		cd.chans.DeleteChan(key)
 		ch = nil
