@@ -7,13 +7,13 @@ package limitget
 var MaxConcurrency = 1000
 
 type Chans struct {
-	maxConCh chan uint8 //The channel is used for control the max concurrency number of get data from database
+	MaxConCh chan uint8 //The channel is used for control the max concurrency number of get data from database
 }
 
 func (chs *Chans) LimitGet() {
-	chs.maxConCh <- uint8(1)
+	chs.MaxConCh <- uint8(1)
 }
 
 func (chs *Chans) ReleaseGet() {
-	<-chs.maxConCh
+	<-chs.MaxConCh
 }
