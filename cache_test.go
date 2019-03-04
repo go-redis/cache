@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -175,11 +176,7 @@ var _ = Describe("Codec", func() {
 			keysToLoad := []string{}
 			keysToLoad = append(keysToLoad, keys ...)
 			keysToLoad = append(keysToLoad, "absent-key", "non-exists-key")
-			rand.Shuffle(len(keysToLoad), func(i, j int) {
-				tmp := keysToLoad[i]
-				keysToLoad[i] = keysToLoad[j]
-				keysToLoad[j] = tmp
-			})
+			shuffle(keysToLoad)
 			err := codec.MGet(dstMap, keys ...)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -496,3 +493,15 @@ func newCodec() *cache.Codec {
 		},
 	}
 }
+
+func shuffle(slice interface{}) {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rv := reflect.ValueOf(slice)
+	swap := reflect.Swapper(slice)
+	length := rv.Len()
+	for i := length - 1; i > 0; i-- {
+		j := rnd.Intn(i + 1)
+		swap(i, j)
+	}
+}
+
