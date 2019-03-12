@@ -219,8 +219,8 @@ func (cd *Codec) once(item *Item) error {
 	if err != nil {
 		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
 		if cached {
-			_ = cd.Delete(item.Key)
-			return cd.Once(item)
+			_ = cd._delete(item.Key)
+			return cd.once(item)
 		}
 		return err
 	}
