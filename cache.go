@@ -1,15 +1,16 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"log"
 	"sync/atomic"
 	"time"
 
-	"github.com/go-redis/redis"
-
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
+
+	"github.com/go-redis/redis"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -22,6 +23,8 @@ type rediser interface {
 }
 
 type Item struct {
+	Ctx context.Context
+
 	Key    string
 	Object interface{}
 
@@ -56,6 +59,7 @@ func (item *Item) exp() time.Duration {
 type Codec struct {
 	Redis rediser
 
+	hooks      []Hook
 	localCache *lrucache.Cache
 
 	Marshal   func(interface{}) ([]byte, error)
@@ -76,7 +80,9 @@ func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
+	cd.beforeSet(item)
 	_, err := cd.setItem(item)
+	cd.afterSet(item)
 	return err
 }
 
@@ -117,10 +123,21 @@ func (cd *Codec) Exists(key string) bool {
 
 // Get gets the object for the given key.
 func (cd *Codec) Get(key string, object interface{}) error {
-	return cd.get(key, object, false)
+	return cd.get(nil, key, object)
 }
 
-func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error {
+func (cd *Codec) GetContext(c context.Context, key string, object interface{}) error {
+	return cd.get(c, key, object)
+}
+
+func (cd *Codec) get(c context.Context, key string, object interface{}) error {
+	cd.beforeGet(c, key, object)
+	err := cd._get(key, object, false)
+	cd.afterGet(c, key, object)
+	return err
+}
+
+func (cd *Codec) _get(key string, object interface{}, onlyLocalCache bool) error {
 	b, err := cd.getBytes(key, onlyLocalCache)
 	if err != nil {
 		return err
@@ -182,6 +199,13 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
 func (cd *Codec) Once(item *Item) error {
+	cd.beforeOnce(item)
+	err := cd.once(item)
+	cd.afterOnce(item)
+	return err
+}
+
+func (cd *Codec) once(item *Item) error {
 	b, cached, err := cd.getSetItemBytesOnce(item)
 	if err != nil {
 		return err
@@ -197,9 +221,8 @@ func (cd *Codec) Once(item *Item) error {
 		if cached {
 			_ = cd.Delete(item.Key)
 			return cd.Once(item)
-		} else {
-			return err
 		}
+		return err
 	}
 
 	return nil
@@ -251,6 +274,21 @@ func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
 }
 
 func (cd *Codec) Delete(key string) error {
+	return cd.delete(nil, key)
+}
+
+func (cd *Codec) DeleteContext(c context.Context, key string) error {
+	return cd.delete(c, key)
+}
+
+func (cd *Codec) delete(c context.Context, key string) error {
+	cd.beforeDelete(c, key)
+	err := cd._delete(key)
+	cd.afterDelete(c, key)
+	return err
+}
+
+func (cd *Codec) _delete(key string) error {
 	if cd.localCache != nil {
 		cd.localCache.Delete(key)
 	}
@@ -271,6 +309,72 @@ func (cd *Codec) Delete(key string) error {
 		return ErrCacheMiss
 	}
 	return nil
+}
+
+type Hook interface {
+	BeforeSet(item *Item)
+	AfterSet(item *Item)
+
+	BeforeGet(c context.Context, key string, object interface{})
+	AfterGet(c context.Context, key string, object interface{})
+
+	BeforeDelete(c context.Context, key string)
+	AfterDelete(c context.Context, key string)
+
+	BeforeOnce(item *Item)
+	AfterOnce(item *Item)
+}
+
+func (cd *Codec) AddHook(h Hook) {
+	cd.hooks = append(cd.hooks, h)
+}
+
+func (cd *Codec) beforeSet(item *Item) {
+	for _, h := range cd.hooks {
+		h.BeforeSet(item)
+	}
+}
+
+func (cd *Codec) afterSet(item *Item) {
+	for _, h := range cd.hooks {
+		h.AfterSet(item)
+	}
+}
+
+func (cd *Codec) beforeGet(c context.Context, key string, object interface{}) {
+	for _, h := range cd.hooks {
+		h.BeforeGet(c, key, object)
+	}
+}
+
+func (cd *Codec) afterGet(c context.Context, key string, object interface{}) {
+	for _, h := range cd.hooks {
+		h.AfterGet(c, key, object)
+	}
+}
+
+func (cd *Codec) beforeDelete(c context.Context, key string) {
+	for _, h := range cd.hooks {
+		h.BeforeDelete(c, key)
+	}
+}
+
+func (cd *Codec) afterDelete(c context.Context, key string) {
+	for _, h := range cd.hooks {
+		h.AfterDelete(c, key)
+	}
+}
+
+func (cd *Codec) beforeOnce(item *Item) {
+	for _, h := range cd.hooks {
+		h.BeforeOnce(item)
+	}
+}
+
+func (cd *Codec) afterOnce(item *Item) {
+	for _, h := range cd.hooks {
+		h.AfterOnce(item)
+	}
 }
 
 type Stats struct {
