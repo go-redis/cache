@@ -16,6 +16,10 @@ import (
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
 
+func SetLogger(logger internal.Logger) {
+	internal.Log = logger
+}
+
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
 	Get(key string) *redis.StringCmd
