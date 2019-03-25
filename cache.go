@@ -3,10 +3,10 @@ package cache
 import (
 	"context"
 	"errors"
-	"log"
 	"sync/atomic"
 	"time"
 
+	"github.com/go-redis/cache/internal"
 	"github.com/go-redis/cache/internal/lrucache"
 	"github.com/go-redis/cache/internal/singleflight"
 
@@ -15,6 +15,10 @@ import (
 
 var ErrCacheMiss = errors.New("cache: key is missing")
 var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+
+func SetLogger(logger internal.Logger) {
+	internal.Log = logger
+}
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -94,7 +98,7 @@ func (cd *Codec) setItem(item *Item) ([]byte, error) {
 
 	b, err := cd.Marshal(object)
 	if err != nil {
-		log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
+		internal.Log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
 		return nil, err
 	}
 
@@ -111,7 +115,7 @@ func (cd *Codec) setItem(item *Item) ([]byte, error) {
 
 	err = cd.Redis.Set(item.Key, b, item.exp()).Err()
 	if err != nil {
-		log.Printf("cache: Set key=%q failed: %s", item.Key, err)
+		internal.Log.Printf("cache: Set key=%q failed: %s", item.Key, err)
 	}
 	return b, err
 }
@@ -149,7 +153,7 @@ func (cd *Codec) _get(key string, object interface{}, onlyLocalCache bool) error
 
 	err = cd.Unmarshal(b, object)
 	if err != nil {
-		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", key, object, err)
+		internal.Log.Printf("cache: key=%q Unmarshal(%T) failed: %s", key, object, err)
 		return err
 	}
 
@@ -182,7 +186,7 @@ func (cd *Codec) getBytes(key string, onlyLocalCache bool) ([]byte, error) {
 		if err == redis.Nil {
 			return nil, ErrCacheMiss
 		}
-		log.Printf("cache: Get key=%q failed: %s", key, err)
+		internal.Log.Printf("cache: Get key=%q failed: %s", key, err)
 		return nil, err
 	}
 	atomic.AddUint64(&cd.hits, 1)
@@ -217,7 +221,7 @@ func (cd *Codec) once(item *Item) error {
 
 	err = cd.Unmarshal(b, item.Object)
 	if err != nil {
-		log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
+		internal.Log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
 		if cached {
 			_ = cd._delete(item.Key)
 			return cd.once(item)
@@ -302,7 +306,7 @@ func (cd *Codec) _delete(key string) error {
 
 	deleted, err := cd.Redis.Del(key).Result()
 	if err != nil {
-		log.Printf("cache: Del key=%q failed: %s", key, err)
+		internal.Log.Printf("cache: Del key=%q failed: %s", key, err)
 		return err
 	}
 	if deleted == 0 {
