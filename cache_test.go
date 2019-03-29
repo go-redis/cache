@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/go-redis/cache"
+	"../cache"
 )
 
 func TestGinkgo(t *testing.T) {
@@ -328,6 +328,5 @@ func newCodec() *cache.Codec {
 		}, func(b []byte, v interface{}) error {
 			return msgpack.Unmarshal(b, v)
 		})
-
 
 }

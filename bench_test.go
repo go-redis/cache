@@ -1,11 +1,10 @@
 package cache_test
 
 import (
+	"../cache"
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/go-redis/cache"
 )
 
 func BenchmarkOnce(b *testing.B) {
