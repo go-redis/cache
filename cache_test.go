@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/vmihailenco/msgpack"
 
-	"../cache"
+	"github.com/WhisperRain/cache"
 )
 
 func TestGinkgo(t *testing.T) {

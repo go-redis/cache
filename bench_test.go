@@ -1,8 +1,8 @@
 package cache_test
 
 import (
-	"../cache"
 	"fmt"
+	"github.com/WhisperRain/cache"
 	"testing"
 	"time"
 )
