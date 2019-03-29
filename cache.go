@@ -8,9 +8,9 @@ import (
 
 	"github.com/go-redis/redis"
 
-	"github.com/go-redis/cache/internal/limitget"
-	"github.com/go-redis/cache/internal/lrucache"
-	"github.com/go-redis/cache/internal/singleflight"
+	"./internal/limitget"
+	"./internal/lrucache"
+	"./internal/singleflight"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
