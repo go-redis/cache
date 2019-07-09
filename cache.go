@@ -199,7 +199,7 @@ func (cd *Codec) Once(item *Item) error {
 	if err != nil {
 		internal.Log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
 		if cached {
-			_ = cd.delete(item.Key)
+			_ = cd.Delete(item.Key)
 			return cd.Once(item)
 		}
 		return err
@@ -254,10 +254,6 @@ func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
 }
 
 func (cd *Codec) Delete(key string) error {
-	return cd.delete(key)
-}
-
-func (cd *Codec) delete(key string) error {
 	if cd.localCache != nil {
 		cd.localCache.Delete(key)
 	}
