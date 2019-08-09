@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-redis/cache/internal"
-	"github.com/go-redis/cache/internal/lrucache"
-	"github.com/go-redis/cache/internal/singleflight"
+	"github.com/go-redis/cache/v7/internal"
+	"github.com/go-redis/cache/v7/internal/lrucache"
+	"github.com/go-redis/cache/v7/internal/singleflight"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")

@@ -5,8 +5,10 @@
 
 ## Installation
 
+go-redis/cache requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installation:
+
 ```shell
-go get -u github.com/go-redis/cache
+go get -u github.com/go-redis/cache/v7
 ```
 
 ## Quickstart
@@ -19,10 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis"
-	"github.com/vmihailenco/msgpack"
+	"github.com/go-redis/redis/v7"
+	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/go-redis/cache"
+	"github.com/go-redis/cache/v7"
 )
 
 type Object struct {
