@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"time"
@@ -26,6 +27,8 @@ type rediser interface {
 }
 
 type Item struct {
+	Ctx context.Context
+
 	Key    string
 	Object interface{}
 
@@ -119,12 +122,22 @@ func (cd *Codec) Exists(key string) bool {
 	return cd.Get(key, nil) == nil
 }
 
-// Get gets the object for the given key.
-func (cd *Codec) Get(key string, object interface{}) error {
-	return cd.get(key, object, false)
+func (cd *Codec) ExistsContext(ctx context.Context, key string) bool {
+	return cd.GetContext(ctx, key, nil) == nil
 }
 
-func (cd *Codec) get(key string, object interface{}, onlyLocalCache bool) error {
+// Get gets the object for the given key.
+func (cd *Codec) Get(key string, object interface{}) error {
+	return cd.get(context.Background(), key, object, false)
+}
+
+func (cd *Codec) GetContext(ctx context.Context, key string, object interface{}) error {
+	return cd.get(ctx, key, object, false)
+}
+
+func (cd *Codec) get(
+	ctx context.Context, key string, object interface{}, onlyLocalCache bool,
+) error {
 	b, err := cd.getBytes(key, onlyLocalCache)
 	if err != nil {
 		return err
@@ -254,6 +267,10 @@ func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
 }
 
 func (cd *Codec) Delete(key string) error {
+	return cd.DeleteContext(context.Background(), key)
+}
+
+func (cd *Codec) DeleteContext(ctx context.Context, key string) error {
 	if cd.localCache != nil {
 		cd.localCache.Delete(key)
 	}
