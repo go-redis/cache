@@ -40,6 +40,13 @@ type Item struct {
 	Expiration time.Duration
 }
 
+func (item *Item) Context() context.Context {
+	if item.Ctx == nil {
+		return context.Background()
+	}
+	return item.Ctx
+}
+
 func (item *Item) object() (interface{}, error) {
 	if item.Object != nil {
 		return item.Object, nil
@@ -83,24 +90,25 @@ func (cd *Codec) UseLocalCache(maxLen int, expiration time.Duration) {
 
 // Set caches the item.
 func (cd *Codec) Set(item *Item) error {
-	_, err := cd.setItem(item)
+	obj, err := item.object()
+	if err != nil {
+		return err
+	}
+	_, err = cd.set(item.Context(), item.Key, obj, item.exp())
 	return err
 }
 
-func (cd *Codec) setItem(item *Item) ([]byte, error) {
-	object, err := item.object()
+func (cd *Codec) set(
+	ctx context.Context, key string, obj interface{}, exp time.Duration,
+) ([]byte, error) {
+	b, err := cd.Marshal(obj)
 	if err != nil {
-		return nil, err
-	}
-
-	b, err := cd.Marshal(object)
-	if err != nil {
-		internal.Log.Printf("cache: Marshal key=%q failed: %s", item.Key, err)
+		internal.Log.Printf("cache: Marshal key=%q failed: %s", key, err)
 		return nil, err
 	}
 
 	if cd.localCache != nil {
-		cd.localCache.Set(item.Key, b)
+		cd.localCache.Set(key, b)
 	}
 
 	if cd.Redis == nil {
@@ -110,9 +118,9 @@ func (cd *Codec) setItem(item *Item) ([]byte, error) {
 		return b, nil
 	}
 
-	err = cd.Redis.Set(item.Key, b, item.exp()).Err()
+	err = cd.Redis.Set(key, b, exp).Err()
 	if err != nil {
-		internal.Log.Printf("cache: Set key=%q failed: %s", item.Key, err)
+		internal.Log.Printf("cache: Set key=%q failed: %s", key, err)
 	}
 	return b, err
 }
@@ -241,11 +249,7 @@ func (cd *Codec) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 			return nil, err
 		}
 
-		b, err = cd.setItem(&Item{
-			Key:        item.Key,
-			Object:     obj,
-			Expiration: item.Expiration,
-		})
+		b, err = cd.set(item.Context(), item.Key, obj, item.exp())
 		if b != nil {
 			// Ignore error if we have the result.
 			return b, nil
