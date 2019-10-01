@@ -319,7 +319,7 @@ func newRing() *redis.Ring {
 func newCodec() *cache.Codec {
 	ring := newRing()
 	_ = ring.ForEachShard(func(client *redis.Client) error {
-		return client.FlushDb().Err()
+		return client.FlushDB().Err()
 	})
 
 	return &cache.Codec{
