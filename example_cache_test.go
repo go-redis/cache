@@ -40,11 +40,13 @@ func Example_basicUsage() {
 		Num: 42,
 	}
 
-	codec.Set(&cache.Item{
+	if err := codec.Set(&cache.Item{
 		Key:        key,
 		Object:     obj,
 		Expiration: time.Hour,
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	var wanted Object
 	if err := codec.Get(key, &wanted); err == nil {

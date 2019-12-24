@@ -7,14 +7,15 @@
 
 go-redis/cache requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installation:
 
-```shell
+``` shell
+go mod init github.com/my/repo
 go get -u github.com/go-redis/cache/v7
 ```
 
 ## Quickstart
 
 
-```go
+``` go
 package cache_test
 
 import (
