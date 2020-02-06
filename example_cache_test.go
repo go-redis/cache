@@ -1,6 +1,7 @@
 package cache_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,6 +35,7 @@ func Example_basicUsage() {
 		},
 	}
 
+	ctx := context.TODO()
 	key := "mykey"
 	obj := &Object{
 		Str: "mystring",
@@ -41,6 +43,7 @@ func Example_basicUsage() {
 	}
 
 	if err := codec.Set(&cache.Item{
+		Ctx:        ctx,
 		Key:        key,
 		Object:     obj,
 		Expiration: time.Hour,
@@ -49,7 +52,7 @@ func Example_basicUsage() {
 	}
 
 	var wanted Object
-	if err := codec.Get(key, &wanted); err == nil {
+	if err := codec.Get(ctx, key, &wanted); err == nil {
 		fmt.Println(wanted)
 	}
 

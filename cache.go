@@ -126,20 +126,12 @@ func (cd *Codec) set(
 }
 
 // Exists reports whether object for the given key exists.
-func (cd *Codec) Exists(key string) bool {
-	return cd.Get(key, nil) == nil
-}
-
-func (cd *Codec) ExistsContext(ctx context.Context, key string) bool {
-	return cd.GetContext(ctx, key, nil) == nil
+func (cd *Codec) Exists(ctx context.Context, key string) bool {
+	return cd.Get(ctx, key, nil) == nil
 }
 
 // Get gets the object for the given key.
-func (cd *Codec) Get(key string, object interface{}) error {
-	return cd.get(context.Background(), key, object, false)
-}
-
-func (cd *Codec) GetContext(ctx context.Context, key string, object interface{}) error {
+func (cd *Codec) Get(ctx context.Context, key string, object interface{}) error {
 	return cd.get(ctx, key, object, false)
 }
 
@@ -220,7 +212,7 @@ func (cd *Codec) Once(item *Item) error {
 	if err != nil {
 		internal.Log.Printf("cache: key=%q Unmarshal(%T) failed: %s", item.Key, item.Object, err)
 		if cached {
-			_ = cd.Delete(item.Key)
+			_ = cd.Delete(item.Context(), item.Key)
 			return cd.Once(item)
 		}
 		return err
@@ -270,11 +262,7 @@ func (cd *Codec) getItemBytesFast(item *Item) ([]byte, error) {
 	return cd.getBytes(item.Key, true)
 }
 
-func (cd *Codec) Delete(key string) error {
-	return cd.DeleteContext(context.Background(), key)
-}
-
-func (cd *Codec) DeleteContext(ctx context.Context, key string) error {
+func (cd *Codec) Delete(ctx context.Context, key string) error {
 	if cd.localCache != nil {
 		cd.localCache.Delete(key)
 	}

@@ -1,6 +1,7 @@
 package cache_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"sync"
@@ -38,6 +39,8 @@ func perform(n int, cbs ...func(int)) {
 }
 
 var _ = Describe("Codec", func() {
+	ctx := context.TODO()
+
 	const key = "mykey"
 	var obj *Object
 
@@ -51,32 +54,34 @@ var _ = Describe("Codec", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = codec.Get(key, nil)
+			err = codec.Get(ctx, key, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(codec.Exists(key)).To(BeTrue())
+			Expect(codec.Exists(ctx, key)).To(BeTrue())
 		})
 
 		It("Deletes key", func() {
 			err := codec.Set(&cache.Item{
+				Ctx:        ctx,
 				Key:        key,
 				Expiration: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(codec.Exists(key)).To(BeTrue())
+			Expect(codec.Exists(ctx, key)).To(BeTrue())
 
-			err = codec.Delete(key)
+			err = codec.Delete(ctx, key)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = codec.Get(key, nil)
+			err = codec.Get(ctx, key, nil)
 			Expect(err).To(Equal(cache.ErrCacheMiss))
 
-			Expect(codec.Exists(key)).To(BeFalse())
+			Expect(codec.Exists(ctx, key)).To(BeFalse())
 		})
 
 		It("Gets and Sets data", func() {
 			err := codec.Set(&cache.Item{
+				Ctx:        ctx,
 				Key:        key,
 				Object:     obj,
 				Expiration: time.Hour,
@@ -84,26 +89,28 @@ var _ = Describe("Codec", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			wanted := new(Object)
-			err = codec.Get(key, wanted)
+			err = codec.Get(ctx, key, wanted)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(wanted).To(Equal(obj))
 
-			Expect(codec.Exists(key)).To(BeTrue())
+			Expect(codec.Exists(ctx, key)).To(BeTrue())
 		})
 
 		Describe("Once func", func() {
 			It("calls Func when cache fails", func() {
 				err := codec.Set(&cache.Item{
+					Ctx:    ctx,
 					Key:    key,
 					Object: "*",
 				})
 				Expect(err).NotTo(HaveOccurred())
 
 				var got bool
-				err = codec.Get(key, &got)
+				err = codec.Get(ctx, key, &got)
 				Expect(err).To(MatchError("msgpack: invalid code=a1 decoding bool"))
 
 				err = codec.Once(&cache.Item{
+					Ctx:    ctx,
 					Key:    key,
 					Object: &got,
 					Func: func() (interface{}, error) {
@@ -114,7 +121,7 @@ var _ = Describe("Codec", func() {
 				Expect(got).To(BeTrue())
 
 				got = false
-				err = codec.Get(key, &got)
+				err = codec.Get(ctx, key, &got)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(BeTrue())
 			})
@@ -123,6 +130,7 @@ var _ = Describe("Codec", func() {
 				perform(100, func(int) {
 					var got bool
 					err := codec.Once(&cache.Item{
+						Ctx:    ctx,
 						Key:    key,
 						Object: &got,
 						Func: func() (interface{}, error) {
@@ -134,10 +142,11 @@ var _ = Describe("Codec", func() {
 				})
 
 				var got bool
-				err := codec.Get(key, &got)
+				err := codec.Get(ctx, key, &got)
 				Expect(err).To(Equal(cache.ErrCacheMiss))
 
 				err = codec.Once(&cache.Item{
+					Ctx:    ctx,
 					Key:    key,
 					Object: &got,
 					Func: func() (interface{}, error) {
@@ -153,6 +162,7 @@ var _ = Describe("Codec", func() {
 				perform(100, func(int) {
 					got := new(Object)
 					err := codec.Once(&cache.Item{
+						Ctx:    ctx,
 						Key:    key,
 						Object: got,
 						Func: func() (interface{}, error) {
@@ -171,6 +181,7 @@ var _ = Describe("Codec", func() {
 				perform(100, func(int) {
 					got := new(Object)
 					err := codec.Once(&cache.Item{
+						Ctx:    ctx,
 						Key:    key,
 						Object: got,
 						Func: func() (interface{}, error) {
@@ -189,6 +200,7 @@ var _ = Describe("Codec", func() {
 				perform(100, func(int) {
 					var got bool
 					err := codec.Once(&cache.Item{
+						Ctx:    ctx,
 						Key:    key,
 						Object: &got,
 						Func: func() (interface{}, error) {
@@ -206,6 +218,7 @@ var _ = Describe("Codec", func() {
 				var callCount int64
 				perform(100, func(int) {
 					err := codec.Once(&cache.Item{
+						Ctx: ctx,
 						Key: key,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
@@ -221,6 +234,7 @@ var _ = Describe("Codec", func() {
 				var callCount int64
 				perform(100, func(int) {
 					err := codec.Once(&cache.Item{
+						Ctx: ctx,
 						Key: key,
 						Func: func() (interface{}, error) {
 							time.Sleep(100 * time.Millisecond)
@@ -238,6 +252,7 @@ var _ = Describe("Codec", func() {
 				do := func(sleep time.Duration) (int, error) {
 					var n int
 					err := codec.Once(&cache.Item{
+						Ctx:    ctx,
 						Key:    key,
 						Object: &n,
 						Func: func() (interface{}, error) {
