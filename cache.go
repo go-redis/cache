@@ -303,7 +303,7 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 	if len(b) == 0 || cd.opt.LocalCacheTTL == 0 {
 		return b, true
 	}
-	if len(b) <= 4 {
+	if len(b) < 4 {
 		panic("not reached")
 	}
 

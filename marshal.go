@@ -39,6 +39,10 @@ var encPool = sync.Pool{
 }
 
 func marshal(buf *bufpool.Buffer, value interface{}) ([]byte, error) {
+	if value == nil {
+		return nil, nil
+	}
+
 	enc := encPool.Get().(*msgpack.Encoder)
 
 	enc.Reset(buf)
