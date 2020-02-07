@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/VictoriaMetrics/fastcache"
 	"github.com/go-redis/redis/v7"
 
 	"github.com/go-redis/cache/v7"
@@ -23,9 +24,10 @@ func Example_basicUsage() {
 		},
 	})
 
-	codec := &cache.Codec{
-		Redis: ring,
-	}
+	mycache := cache.New(&cache.Options{
+		Redis:      ring,
+		LocalCache: fastcache.New(100 << 20), // 100 MB
+	})
 
 	ctx := context.TODO()
 	key := "mykey"
@@ -34,17 +36,17 @@ func Example_basicUsage() {
 		Num: 42,
 	}
 
-	if err := codec.Set(&cache.Item{
+	if err := mycache.Set(&cache.Item{
 		Ctx:        ctx,
 		Key:        key,
-		Object:     obj,
+		Value:      obj,
 		Expiration: time.Hour,
 	}); err != nil {
 		panic(err)
 	}
 
 	var wanted Object
-	if err := codec.Get(ctx, key, &wanted); err == nil {
+	if err := mycache.Get(ctx, key, &wanted); err == nil {
 		fmt.Println(wanted)
 	}
 
@@ -59,14 +61,15 @@ func Example_advancedUsage() {
 		},
 	})
 
-	codec := &cache.Codec{
-		Redis: ring,
-	}
+	mycache := cache.New(&cache.Options{
+		Redis:      ring,
+		LocalCache: fastcache.New(100 << 20), // 100 MB
+	})
 
 	obj := new(Object)
-	err := codec.Once(&cache.Item{
-		Key:    "mykey",
-		Object: obj, // destination
+	err := mycache.Once(&cache.Item{
+		Key:   "mykey",
+		Value: obj, // destination
 		Func: func() (interface{}, error) {
 			return &Object{
 				Str: "mystring",

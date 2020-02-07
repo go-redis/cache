@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/VictoriaMetrics/fastcache"
 	"github.com/go-redis/redis/v7"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -37,81 +38,81 @@ func perform(n int, cbs ...func(int)) {
 	wg.Wait()
 }
 
-var _ = Describe("Codec", func() {
+var _ = Describe("Cache", func() {
 	ctx := context.TODO()
 
 	const key = "mykey"
 	var obj *Object
 
-	var codec *cache.Codec
+	var mycache *cache.Cache
 
-	testCodec := func() {
+	testCache := func() {
 		It("Gets and Sets nil", func() {
-			err := codec.Set(&cache.Item{
+			err := mycache.Set(&cache.Item{
 				Key:        key,
 				Expiration: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			err = codec.Get(ctx, key, nil)
+			err = mycache.Get(ctx, key, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(codec.Exists(ctx, key)).To(BeTrue())
+			Expect(mycache.Exists(ctx, key)).To(BeTrue())
 		})
 
 		It("Deletes key", func() {
-			err := codec.Set(&cache.Item{
+			err := mycache.Set(&cache.Item{
 				Ctx:        ctx,
 				Key:        key,
 				Expiration: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(codec.Exists(ctx, key)).To(BeTrue())
+			Expect(mycache.Exists(ctx, key)).To(BeTrue())
 
-			err = codec.Delete(ctx, key)
+			err = mycache.Delete(ctx, key)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = codec.Get(ctx, key, nil)
+			err = mycache.Get(ctx, key, nil)
 			Expect(err).To(Equal(cache.ErrCacheMiss))
 
-			Expect(codec.Exists(ctx, key)).To(BeFalse())
+			Expect(mycache.Exists(ctx, key)).To(BeFalse())
 		})
 
 		It("Gets and Sets data", func() {
-			err := codec.Set(&cache.Item{
+			err := mycache.Set(&cache.Item{
 				Ctx:        ctx,
 				Key:        key,
-				Object:     obj,
+				Value:      obj,
 				Expiration: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			wanted := new(Object)
-			err = codec.Get(ctx, key, wanted)
+			err = mycache.Get(ctx, key, wanted)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(wanted).To(Equal(obj))
 
-			Expect(codec.Exists(ctx, key)).To(BeTrue())
+			Expect(mycache.Exists(ctx, key)).To(BeTrue())
 		})
 
 		Describe("Once func", func() {
 			It("calls Func when cache fails", func() {
-				err := codec.Set(&cache.Item{
-					Ctx:    ctx,
-					Key:    key,
-					Object: "*",
+				err := mycache.Set(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: "*",
 				})
 				Expect(err).NotTo(HaveOccurred())
 
 				var got bool
-				err = codec.Get(ctx, key, &got)
+				err = mycache.Get(ctx, key, &got)
 				Expect(err).To(MatchError("msgpack: invalid code=a1 decoding bool"))
 
-				err = codec.Once(&cache.Item{
-					Ctx:    ctx,
-					Key:    key,
-					Object: &got,
+				err = mycache.Once(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &got,
 					Func: func() (interface{}, error) {
 						return true, nil
 					},
@@ -120,7 +121,7 @@ var _ = Describe("Codec", func() {
 				Expect(got).To(BeTrue())
 
 				got = false
-				err = codec.Get(ctx, key, &got)
+				err = mycache.Get(ctx, key, &got)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(got).To(BeTrue())
 			})
@@ -128,10 +129,10 @@ var _ = Describe("Codec", func() {
 			It("does not cache when Func fails", func() {
 				perform(100, func(int) {
 					var got bool
-					err := codec.Once(&cache.Item{
-						Ctx:    ctx,
-						Key:    key,
-						Object: &got,
+					err := mycache.Once(&cache.Item{
+						Ctx:   ctx,
+						Key:   key,
+						Value: &got,
 						Func: func() (interface{}, error) {
 							return nil, io.EOF
 						},
@@ -141,13 +142,13 @@ var _ = Describe("Codec", func() {
 				})
 
 				var got bool
-				err := codec.Get(ctx, key, &got)
+				err := mycache.Get(ctx, key, &got)
 				Expect(err).To(Equal(cache.ErrCacheMiss))
 
-				err = codec.Once(&cache.Item{
-					Ctx:    ctx,
-					Key:    key,
-					Object: &got,
+				err = mycache.Once(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &got,
 					Func: func() (interface{}, error) {
 						return true, nil
 					},
@@ -156,14 +157,14 @@ var _ = Describe("Codec", func() {
 				Expect(got).To(BeTrue())
 			})
 
-			It("works with Object", func() {
+			It("works with Value", func() {
 				var callCount int64
 				perform(100, func(int) {
 					got := new(Object)
-					err := codec.Once(&cache.Item{
-						Ctx:    ctx,
-						Key:    key,
-						Object: got,
+					err := mycache.Once(&cache.Item{
+						Ctx:   ctx,
+						Key:   key,
+						Value: got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return obj, nil
@@ -179,10 +180,10 @@ var _ = Describe("Codec", func() {
 				var callCount int64
 				perform(100, func(int) {
 					got := new(Object)
-					err := codec.Once(&cache.Item{
-						Ctx:    ctx,
-						Key:    key,
-						Object: got,
+					err := mycache.Once(&cache.Item{
+						Ctx:   ctx,
+						Key:   key,
+						Value: got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return *obj, nil
@@ -198,10 +199,10 @@ var _ = Describe("Codec", func() {
 				var callCount int64
 				perform(100, func(int) {
 					var got bool
-					err := codec.Once(&cache.Item{
-						Ctx:    ctx,
-						Key:    key,
-						Object: &got,
+					err := mycache.Once(&cache.Item{
+						Ctx:   ctx,
+						Key:   key,
+						Value: &got,
 						Func: func() (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
 							return true, nil
@@ -213,10 +214,10 @@ var _ = Describe("Codec", func() {
 				Expect(callCount).To(Equal(int64(1)))
 			})
 
-			It("works without Object and nil result", func() {
+			It("works without Value and nil result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					err := codec.Once(&cache.Item{
+					err := mycache.Once(&cache.Item{
 						Ctx: ctx,
 						Key: key,
 						Func: func() (interface{}, error) {
@@ -229,10 +230,10 @@ var _ = Describe("Codec", func() {
 				Expect(callCount).To(Equal(int64(1)))
 			})
 
-			It("works without Object and error result", func() {
+			It("works without Value and error result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					err := codec.Once(&cache.Item{
+					err := mycache.Once(&cache.Item{
 						Ctx: ctx,
 						Key: key,
 						Func: func() (interface{}, error) {
@@ -250,10 +251,10 @@ var _ = Describe("Codec", func() {
 				var callCount int64
 				do := func(sleep time.Duration) (int, error) {
 					var n int
-					err := codec.Once(&cache.Item{
-						Ctx:    ctx,
-						Key:    key,
-						Object: &n,
+					err := mycache.Once(&cache.Item{
+						Ctx:   ctx,
+						Key:   key,
+						Value: &n,
 						Func: func() (interface{}, error) {
 							time.Sleep(sleep)
 
@@ -296,29 +297,28 @@ var _ = Describe("Codec", func() {
 
 	Context("without LocalCache", func() {
 		BeforeEach(func() {
-			codec = newCodec()
+			mycache = newCache()
 		})
 
-		testCodec()
+		testCache()
 	})
 
 	Context("with LocalCache", func() {
 		BeforeEach(func() {
-			codec = newCodec()
-			codec.UseLocalCache(1000, time.Minute)
+			mycache = newCacheWithLocal()
 		})
 
-		testCodec()
+		testCache()
 	})
 
 	Context("with LocalCache and without Redis", func() {
 		BeforeEach(func() {
-			codec = newCodec()
-			codec.UseLocalCache(1000, time.Minute)
-			codec.Redis = nil
+			mycache = cache.New(&cache.Options{
+				LocalCache: fastcache.New(1 << 20),
+			})
 		})
 
-		testCodec()
+		testCache()
 	})
 })
 
@@ -330,13 +330,25 @@ func newRing() *redis.Ring {
 	})
 }
 
-func newCodec() *cache.Codec {
+func newCache() *cache.Cache {
 	ring := newRing()
 	_ = ring.ForEachShard(func(client *redis.Client) error {
 		return client.FlushDB().Err()
 	})
 
-	return &cache.Codec{
+	return cache.New(&cache.Options{
 		Redis: ring,
-	}
+	})
+}
+
+func newCacheWithLocal() *cache.Cache {
+	ring := newRing()
+	_ = ring.ForEachShard(func(client *redis.Client) error {
+		return client.FlushDB().Err()
+	})
+
+	return cache.New(&cache.Options{
+		Redis:      ring,
+		LocalCache: fastcache.New(1 << 20),
+	})
 }
