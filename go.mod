@@ -1,9 +1,10 @@
-module github.com/go-redis/cache/v7
+module github.com/go-redis/cache/v8
 
-go 1.13
+go 1.11
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7
+	github.com/go-redis/cache/v7 v7.0.2 // indirect
 	github.com/go-redis/redis/v7 v7.0.0-beta.6
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
