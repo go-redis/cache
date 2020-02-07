@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/binary"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/klauspost/compress/s2"
@@ -31,8 +32,23 @@ func decodeTime(b []byte) time.Time {
 
 //------------------------------------------------------------------------------
 
+var encPool = sync.Pool{
+	New: func() interface{} {
+		return msgpack.NewEncoder(nil)
+	},
+}
+
 func marshal(buf *bufpool.Buffer, value interface{}) ([]byte, error) {
-	if err := msgpack.NewEncoder(buf).Encode(value); err != nil {
+	enc := encPool.Get().(*msgpack.Encoder)
+
+	enc.Reset(buf)
+	enc.UseCompactEncoding(true)
+
+	err := enc.Encode(value)
+
+	encPool.Put(enc)
+
+	if err != nil {
 		return nil, err
 	}
 
