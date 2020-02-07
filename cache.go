@@ -2,15 +2,13 @@ package cache
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"sync/atomic"
 	"time"
 
-	"github.com/vmihailenco/msgpack/v4"
-
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/go-redis/redis/v7"
+	"github.com/vmihailenco/bufpool"
 	"go4.org/syncutil/singleflight"
 )
 
@@ -87,6 +85,7 @@ func (opt *Options) init() {
 type Cache struct {
 	opt *Options
 
+	pool  bufpool.Pool
 	group singleflight.Group
 
 	hits   uint64
@@ -102,21 +101,25 @@ func New(opt *Options) *Cache {
 
 // Set caches the item.
 func (cd *Cache) Set(item *Item) error {
-	obj, err := item.value()
+	value, err := item.value()
 	if err != nil {
 		return err
 	}
-	_, err = cd.set(item.Context(), item.Key, obj, item.exp())
+
+	buf := cd.pool.Get()
+	_, err = cd.set(item.Context(), item.Key, value, item.exp(), buf)
+	cd.pool.Put(buf)
 	return err
 }
 
 func (cd *Cache) set(
 	ctx context.Context,
 	key string,
-	obj interface{},
+	value interface{},
 	exp time.Duration,
+	buf *bufpool.Buffer,
 ) ([]byte, error) {
-	b, err := msgpack.Marshal(obj)
+	b, err := marshal(buf, value)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +162,7 @@ func (cd *Cache) get(
 		return nil
 	}
 
-	return msgpack.Unmarshal(b, value)
+	return unmarshal(b, value)
 }
 
 func (cd *Cache) getBytes(key string) ([]byte, error) {
@@ -213,7 +216,7 @@ func (cd *Cache) Once(item *Item) error {
 		return nil
 	}
 
-	if err := msgpack.Unmarshal(b, item.Value); err != nil {
+	if err := unmarshal(b, item.Value); err != nil {
 		if cached {
 			_ = cd.Delete(item.Context(), item.Key)
 			return cd.Once(item)
@@ -224,10 +227,8 @@ func (cd *Cache) Once(item *Item) error {
 	return nil
 }
 
-func (cd *Cache) getSetItemBytesOnce(
-	item *Item,
-) (b []byte, cached bool, err error) {
-	if cd.opt.LocalCache != nil && cd.opt.LocalCache.Has([]byte(item.Key)) {
+func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
+	if cd.opt.LocalCache != nil {
 		b, ok := cd.localGet(item.Key)
 		if ok {
 			return b, true, nil
@@ -241,12 +242,19 @@ func (cd *Cache) getSetItemBytesOnce(
 			return b, nil
 		}
 
-		obj, err := item.Func()
+		value, err := item.Func()
 		if err != nil {
 			return nil, err
 		}
 
-		return cd.set(item.Context(), item.Key, obj, item.exp())
+		buf := cd.pool.Get()
+		b, err = cd.set(item.Context(), item.Key, value, item.exp(), buf)
+		if err != nil {
+			return nil, err
+		}
+
+		cd.pool.UpdateLen(buf.Len())
+		return b, nil
 	})
 	if err != nil {
 		return nil, false, err
@@ -305,18 +313,6 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 	}
 
 	return b[:len(b)-4], true
-}
-
-var epoch = time.Date(2020, time.January, 01, 00, 0, 0, 0, time.UTC).Unix()
-
-func encodeTime(b []byte, tm time.Time) {
-	secs := tm.Unix() - epoch
-	binary.LittleEndian.PutUint32(b, uint32(secs))
-}
-
-func decodeTime(b []byte) time.Time {
-	secs := binary.LittleEndian.Uint32(b)
-	return time.Unix(int64(secs)+epoch, 0)
 }
 
 //------------------------------------------------------------------------------

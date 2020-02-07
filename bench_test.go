@@ -1,7 +1,7 @@
 package cache_test
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-redis/cache/v8"
@@ -9,24 +9,49 @@ import (
 
 func BenchmarkOnce(b *testing.B) {
 	mycache := newCacheWithLocal()
+	obj := &Object{
+		Str: strings.Repeat("my very large string", 10),
+		Num: 42,
+	}
 
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			var n int
+			var dst Object
 			err := mycache.Once(&cache.Item{
 				Key:   "bench-once",
-				Value: &n,
+				Value: &dst,
 				Func: func() (interface{}, error) {
-					return 42, nil
+					return obj, nil
 				},
 			})
 			if err != nil {
-				panic(err)
+				b.Fatal(err)
 			}
-			if n != 42 {
-				panic(fmt.Sprintf("%d != 42", n))
+			if dst.Num != 42 {
+				b.Fatalf("%d != 42", dst.Num)
+			}
+		}
+	})
+}
+
+func BenchmarkSet(b *testing.B) {
+	mycache := newCacheWithLocal()
+	obj := &Object{
+		Str: strings.Repeat("my very large string", 10),
+		Num: 42,
+	}
+
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if err := mycache.Set(&cache.Item{
+				Key:   "bench-set",
+				Value: obj,
+			}); err != nil {
+				b.Fatal(err)
 			}
 		}
 	})
