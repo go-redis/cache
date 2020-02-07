@@ -1,15 +1,28 @@
 package cache
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/go-redis/redis/v7"
+	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
+	"github.com/vmihailenco/msgpack/v4"
 	"go4.org/syncutil/singleflight"
+)
+
+const compressionThreshold = 64
+
+const (
+	noCompression = 0x0
+	s2Compression = 0x1
 )
 
 var ErrCacheMiss = errors.New("cache: key is missing")
@@ -33,6 +46,8 @@ type Item struct {
 
 	// Func returns value to be cached.
 	Func func() (interface{}, error)
+
+	SkipLocalCache bool
 }
 
 func (item *Item) Context() context.Context {
@@ -85,7 +100,6 @@ func (opt *Options) init() {
 type Cache struct {
 	opt *Options
 
-	pool  bufpool.Pool
 	group singleflight.Group
 
 	hits   uint64
@@ -106,9 +120,7 @@ func (cd *Cache) Set(item *Item) error {
 		return err
 	}
 
-	buf := cd.pool.Get()
-	_, err = cd.set(item.Context(), item.Key, value, item.exp(), buf)
-	cd.pool.Put(buf)
+	_, err = cd.set(item.Context(), item.Key, value, item.exp())
 	return err
 }
 
@@ -117,9 +129,8 @@ func (cd *Cache) set(
 	key string,
 	value interface{},
 	exp time.Duration,
-	buf *bufpool.Buffer,
 ) ([]byte, error) {
-	b, err := marshal(buf, value)
+	b, err := cd.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
@@ -145,15 +156,23 @@ func (cd *Cache) Exists(ctx context.Context, key string) bool {
 
 // Get gets the value for the given key.
 func (cd *Cache) Get(ctx context.Context, key string, value interface{}) error {
-	return cd.get(ctx, key, value)
+	return cd.get(ctx, key, value, false)
+}
+
+// Get gets the value for the given key skipping local cache.
+func (cd *Cache) GetSkippingLocalCache(
+	ctx context.Context, key string, value interface{},
+) error {
+	return cd.get(ctx, key, value, true)
 }
 
 func (cd *Cache) get(
 	ctx context.Context,
 	key string,
 	value interface{},
+	skipLocalCache bool,
 ) error {
-	b, err := cd.getBytes(key)
+	b, err := cd.getBytes(key, skipLocalCache)
 	if err != nil {
 		return err
 	}
@@ -162,11 +181,11 @@ func (cd *Cache) get(
 		return nil
 	}
 
-	return unmarshal(b, value)
+	return cd.Unmarshal(b, value)
 }
 
-func (cd *Cache) getBytes(key string) ([]byte, error) {
-	if cd.opt.LocalCache != nil {
+func (cd *Cache) getBytes(key string, skipLocalCache bool) ([]byte, error) {
+	if !skipLocalCache && cd.opt.LocalCache != nil {
 		b, ok := cd.localGet(key)
 		if ok {
 			return b, nil
@@ -195,7 +214,7 @@ func (cd *Cache) getBytes(key string) ([]byte, error) {
 		atomic.AddUint64(&cd.hits, 1)
 	}
 
-	if cd.opt.LocalCache != nil {
+	if !skipLocalCache && cd.opt.LocalCache != nil {
 		cd.localSet(key, b)
 	}
 	return b, nil
@@ -216,7 +235,7 @@ func (cd *Cache) Once(item *Item) error {
 		return nil
 	}
 
-	if err := unmarshal(b, item.Value); err != nil {
+	if err := cd.Unmarshal(b, item.Value); err != nil {
 		if cached {
 			_ = cd.Delete(item.Context(), item.Key)
 			return cd.Once(item)
@@ -236,7 +255,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 	}
 
 	v, err := cd.group.Do(item.Key, func() (interface{}, error) {
-		b, err := cd.getBytes(item.Key)
+		b, err := cd.getBytes(item.Key, item.SkipLocalCache)
 		if err == nil {
 			cached = true
 			return b, nil
@@ -247,13 +266,11 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 			return nil, err
 		}
 
-		buf := cd.pool.Get()
-		b, err = cd.set(item.Context(), item.Key, value, item.exp(), buf)
+		b, err = cd.set(item.Context(), item.Key, value, item.exp())
 		if err != nil {
 			return nil, err
 		}
 
-		cd.pool.UpdateLen(buf.Len())
 		return b, nil
 	})
 	if err != nil {
@@ -315,6 +332,74 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 	return b[:len(b)-4], true
 }
 
+var encPool = sync.Pool{
+	New: func() interface{} {
+		return msgpack.NewEncoder(nil)
+	},
+}
+
+func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	enc := encPool.Get().(*msgpack.Encoder)
+
+	var buf bytes.Buffer
+	enc.Reset(&buf)
+	enc.UseCompactEncoding(true)
+
+	err := enc.Encode(value)
+
+	encPool.Put(enc)
+
+	if err != nil {
+		return nil, err
+	}
+
+	b := buf.Bytes()
+
+	if len(b) < compressionThreshold {
+		b = append(b, noCompression)
+		return b, nil
+	}
+
+	b = s2.Encode(nil, b)
+	b = append(b, s2Compression)
+
+	return b, nil
+}
+
+func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
+	if len(b) == 0 {
+		return nil
+	}
+
+	switch c := b[len(b)-1]; c {
+	case noCompression:
+		b = b[:len(b)-1]
+	case s2Compression:
+		b = b[:len(b)-1]
+
+		n, err := s2.DecodedLen(b)
+		if err != nil {
+			return err
+		}
+
+		buf := bufpool.Get(n)
+		defer bufpool.Put(buf)
+
+		b, err = s2.Decode(buf.Bytes(), b)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("uknownn compression method: %x", c)
+	}
+
+	return msgpack.Unmarshal(b, value)
+}
+
 //------------------------------------------------------------------------------
 
 type Stats struct {
@@ -331,4 +416,18 @@ func (cd *Cache) Stats() *Stats {
 		Hits:   atomic.LoadUint64(&cd.hits),
 		Misses: atomic.LoadUint64(&cd.misses),
 	}
+}
+
+//------------------------------------------------------------------------------
+
+var epoch = time.Date(2020, time.January, 01, 00, 0, 0, 0, time.UTC).Unix()
+
+func encodeTime(b []byte, tm time.Time) {
+	secs := tm.Unix() - epoch
+	binary.LittleEndian.PutUint32(b, uint32(secs))
+}
+
+func decodeTime(b []byte) time.Time {
+	secs := binary.LittleEndian.Uint32(b)
+	return time.Unix(int64(secs)+epoch, 0)
 }
