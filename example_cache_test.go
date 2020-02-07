@@ -37,10 +37,10 @@ func Example_basicUsage() {
 	}
 
 	if err := mycache.Set(&cache.Item{
-		Ctx:        ctx,
-		Key:        key,
-		Value:      obj,
-		Expiration: time.Hour,
+		Ctx:   ctx,
+		Key:   key,
+		Value: obj,
+		TTL:   time.Hour,
 	}); err != nil {
 		panic(err)
 	}

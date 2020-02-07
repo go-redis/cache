@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"sync/atomic"
 	"time"
@@ -28,12 +29,12 @@ type Item struct {
 	Key   string
 	Value interface{}
 
+	// TTL is the cache expiration time.
+	// Default TTL is 1 hour.
+	TTL time.Duration
+
 	// Func returns value to be cached.
 	Func func() (interface{}, error)
-
-	// Expiration is the cache expiration time.
-	// Default expiration is 1 hour.
-	Expiration time.Duration
 }
 
 func (item *Item) Context() context.Context {
@@ -54,13 +55,13 @@ func (item *Item) value() (interface{}, error) {
 }
 
 func (item *Item) exp() time.Duration {
-	if item.Expiration < 0 {
+	if item.TTL < 0 {
 		return 0
 	}
-	if item.Expiration < time.Second {
+	if item.TTL < time.Second {
 		return time.Hour
 	}
-	return item.Expiration
+	return item.TTL
 }
 
 //------------------------------------------------------------------------------
@@ -74,6 +75,15 @@ type Options struct {
 	StatsEnabled bool
 }
 
+func (opt *Options) init() {
+	switch opt.LocalCacheTTL {
+	case -1:
+		opt.LocalCacheTTL = 0
+	case 0:
+		opt.LocalCacheTTL = time.Minute
+	}
+}
+
 type Cache struct {
 	opt *Options
 
@@ -84,6 +94,7 @@ type Cache struct {
 }
 
 func New(opt *Options) *Cache {
+	opt.init()
 	return &Cache{
 		opt: opt,
 	}
@@ -111,7 +122,7 @@ func (cd *Cache) set(
 	}
 
 	if cd.opt.LocalCache != nil {
-		cd.opt.LocalCache.Set([]byte(key), b)
+		cd.localSet(key, b)
 	}
 
 	if cd.opt.Redis == nil {
@@ -153,7 +164,7 @@ func (cd *Cache) get(
 
 func (cd *Cache) getBytes(key string) ([]byte, error) {
 	if cd.opt.LocalCache != nil {
-		b, ok := cd.opt.LocalCache.HasGet(nil, []byte(key))
+		b, ok := cd.localGet(key)
 		if ok {
 			return b, nil
 		}
@@ -168,17 +179,21 @@ func (cd *Cache) getBytes(key string) ([]byte, error) {
 
 	b, err := cd.opt.Redis.Get(key).Bytes()
 	if err != nil {
-		atomic.AddUint64(&cd.misses, 1)
+		if cd.opt.StatsEnabled {
+			atomic.AddUint64(&cd.misses, 1)
+		}
 		if err == redis.Nil {
 			return nil, ErrCacheMiss
 		}
 		return nil, err
 	}
 
-	atomic.AddUint64(&cd.hits, 1)
+	if cd.opt.StatsEnabled {
+		atomic.AddUint64(&cd.hits, 1)
+	}
 
 	if cd.opt.LocalCache != nil {
-		cd.opt.LocalCache.Set([]byte(key), b)
+		cd.localSet(key, b)
 	}
 	return b, nil
 }
@@ -213,7 +228,7 @@ func (cd *Cache) getSetItemBytesOnce(
 	item *Item,
 ) (b []byte, cached bool, err error) {
 	if cd.opt.LocalCache != nil && cd.opt.LocalCache.Has([]byte(item.Key)) {
-		b, ok := cd.opt.LocalCache.HasGet(nil, []byte(item.Key))
+		b, ok := cd.localGet(item.Key)
 		if ok {
 			return b, true, nil
 		}
@@ -261,20 +276,63 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 
+func (cd *Cache) localSet(key string, b []byte) {
+	if cd.opt.LocalCacheTTL > 0 {
+		pos := len(b)
+		b = append(b, make([]byte, 4)...)
+		encodeTime(b[pos:], time.Now())
+	}
+
+	cd.opt.LocalCache.Set([]byte(key), b)
+}
+
+func (cd *Cache) localGet(key string) ([]byte, bool) {
+	b, ok := cd.opt.LocalCache.HasGet(nil, []byte(key))
+	if !ok {
+		return b, false
+	}
+
+	if len(b) == 0 || cd.opt.LocalCacheTTL == 0 {
+		return b, true
+	}
+	if len(b) <= 4 {
+		panic("not reached")
+	}
+
+	tm := decodeTime(b[len(b)-4:])
+	if time.Since(tm) > cd.opt.LocalCacheTTL {
+		return nil, false
+	}
+
+	return b[:len(b)-4], true
+}
+
+var epoch = time.Date(2020, time.January, 01, 00, 0, 0, 0, time.UTC).Unix()
+
+func encodeTime(b []byte, tm time.Time) {
+	secs := tm.Unix() - epoch
+	binary.LittleEndian.PutUint32(b, uint32(secs))
+}
+
+func decodeTime(b []byte) time.Time {
+	secs := binary.LittleEndian.Uint32(b)
+	return time.Unix(int64(secs)+epoch, 0)
+}
+
 //------------------------------------------------------------------------------
 
 type Stats struct {
-	Hits        uint64
-	Misses      uint64
-	LocalHits   uint64
-	LocalMisses uint64
+	Hits   uint64
+	Misses uint64
 }
 
 // Stats returns cache statistics.
 func (cd *Cache) Stats() *Stats {
-	stats := Stats{
+	if !cd.opt.StatsEnabled {
+		return nil
+	}
+	return &Stats{
 		Hits:   atomic.LoadUint64(&cd.hits),
 		Misses: atomic.LoadUint64(&cd.misses),
 	}
-	return &stats
 }

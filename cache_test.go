@@ -49,8 +49,8 @@ var _ = Describe("Cache", func() {
 	testCache := func() {
 		It("Gets and Sets nil", func() {
 			err := mycache.Set(&cache.Item{
-				Key:        key,
-				Expiration: time.Hour,
+				Key: key,
+				TTL: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -62,9 +62,9 @@ var _ = Describe("Cache", func() {
 
 		It("Deletes key", func() {
 			err := mycache.Set(&cache.Item{
-				Ctx:        ctx,
-				Key:        key,
-				Expiration: time.Hour,
+				Ctx: ctx,
+				Key: key,
+				TTL: time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -81,10 +81,10 @@ var _ = Describe("Cache", func() {
 
 		It("Gets and Sets data", func() {
 			err := mycache.Set(&cache.Item{
-				Ctx:        ctx,
-				Key:        key,
-				Value:      obj,
-				Expiration: time.Hour,
+				Ctx:   ctx,
+				Key:   key,
+				Value: obj,
+				TTL:   time.Hour,
 			})
 			Expect(err).NotTo(HaveOccurred())
 
