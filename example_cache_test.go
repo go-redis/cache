@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v7"
-	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/go-redis/cache/v7"
 )
@@ -26,13 +25,6 @@ func Example_basicUsage() {
 
 	codec := &cache.Codec{
 		Redis: ring,
-
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
 	}
 
 	ctx := context.TODO()
@@ -69,13 +61,6 @@ func Example_advancedUsage() {
 
 	codec := &cache.Codec{
 		Redis: ring,
-
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
 	}
 
 	obj := new(Object)
