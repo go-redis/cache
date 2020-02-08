@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -189,11 +190,6 @@ func (cd *Cache) get(
 	if err != nil {
 		return err
 	}
-
-	if value == nil || len(b) == 0 {
-		return nil
-	}
-
 	return cd.Unmarshal(b, value)
 }
 
@@ -347,8 +343,13 @@ var encPool = sync.Pool{
 }
 
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
-	if value == nil {
+	switch value := value.(type) {
+	case nil:
 		return nil, nil
+	case []byte:
+		return value, nil
+	case string:
+		return []byte(value), nil
 	}
 
 	enc := encPool.Get().(*msgpack.Encoder)
@@ -379,6 +380,21 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 }
 
 func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
+	if len(b) == 0 {
+		return nil
+	}
+
+	switch value := value.(type) {
+	case nil:
+		return nil
+	case *[]byte:
+		reflect.ValueOf(value).Elem().SetBytes(b)
+		return nil
+	case *string:
+		reflect.ValueOf(value).Elem().SetString(string(b))
+		return nil
+	}
+
 	if len(b) == 0 {
 		return nil
 	}

@@ -96,18 +96,50 @@ var _ = Describe("Cache", func() {
 			Expect(mycache.Exists(ctx, key)).To(BeTrue())
 		})
 
+		It("Sets string as is", func() {
+			value := "str_value"
+
+			err := mycache.Set(&cache.Item{
+				Ctx:   ctx,
+				Key:   key,
+				Value: value,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			var dst string
+			err = mycache.Get(ctx, key, &dst)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dst).To(Equal(value))
+		})
+
+		It("Sets bytes as is", func() {
+			value := []byte("str_value")
+
+			err := mycache.Set(&cache.Item{
+				Ctx:   ctx,
+				Key:   key,
+				Value: value,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			var dst []byte
+			err = mycache.Get(ctx, key, &dst)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dst).To(Equal(value))
+		})
+
 		Describe("Once func", func() {
 			It("calls Func when cache fails", func() {
 				err := mycache.Set(&cache.Item{
 					Ctx:   ctx,
 					Key:   key,
-					Value: "*",
+					Value: int64(0),
 				})
 				Expect(err).NotTo(HaveOccurred())
 
 				var got bool
 				err = mycache.Get(ctx, key, &got)
-				Expect(err).To(MatchError("msgpack: invalid code=a1 decoding bool"))
+				Expect(err).To(MatchError("msgpack: invalid code=0 decoding bool"))
 
 				err = mycache.Once(&cache.Item{
 					Ctx:   ctx,
