@@ -30,6 +30,9 @@ var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil
 
 type rediser interface {
 	Set(key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	SetXX(key string, value interface{}, expiration time.Duration) *redis.BoolCmd
+	SetNX(key string, value interface{}, expiration time.Duration) *redis.BoolCmd
+
 	Get(key string) *redis.StringCmd
 	Del(keys ...string) *redis.IntCmd
 }
@@ -47,6 +50,13 @@ type Item struct {
 	// Func returns value to be cached.
 	Func func() (interface{}, error)
 
+	// IfExists only sets the key if it already exist.
+	IfExists bool
+
+	// IfNotExists only sets the key if it does not already exist.
+	IfNotExists bool
+
+	// SkipLocalCache skips local cache as if it is not set.
 	SkipLocalCache bool
 }
 
@@ -58,16 +68,16 @@ func (item *Item) Context() context.Context {
 }
 
 func (item *Item) value() (interface{}, error) {
-	if item.Value != nil {
-		return item.Value, nil
-	}
 	if item.Func != nil {
 		return item.Func()
+	}
+	if item.Value != nil {
+		return item.Value, nil
 	}
 	return nil, nil
 }
 
-func (item *Item) exp() time.Duration {
+func (item *Item) ttl() time.Duration {
 	if item.TTL < 0 {
 		return 0
 	}
@@ -115,38 +125,41 @@ func New(opt *Options) *Cache {
 
 // Set caches the item.
 func (cd *Cache) Set(item *Item) error {
-	value, err := item.value()
-	if err != nil {
-		return err
-	}
-
-	_, err = cd.set(item.Context(), item.Key, value, item.exp())
+	_, _, err := cd.set(item)
 	return err
 }
 
-func (cd *Cache) set(
-	ctx context.Context,
-	key string,
-	value interface{},
-	exp time.Duration,
-) ([]byte, error) {
+func (cd *Cache) set(item *Item) ([]byte, bool, error) {
+	value, err := item.value()
+	if err != nil {
+		return nil, false, err
+	}
+
 	b, err := cd.Marshal(value)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	if cd.opt.LocalCache != nil {
-		cd.localSet(key, b)
+		cd.localSet(item.Key, b)
 	}
 
 	if cd.opt.Redis == nil {
 		if cd.opt.LocalCache == nil {
-			return nil, errRedisLocalCacheNil
+			return b, true, errRedisLocalCacheNil
 		}
-		return b, nil
+		return b, true, nil
 	}
 
-	return b, cd.opt.Redis.Set(key, b, exp).Err()
+	if item.IfExists {
+		return b, true, cd.opt.Redis.SetXX(item.Key, b, item.ttl()).Err()
+	}
+
+	if item.IfNotExists {
+		return b, true, cd.opt.Redis.SetNX(item.Key, b, item.ttl()).Err()
+	}
+
+	return b, true, cd.opt.Redis.Set(item.Key, b, item.ttl()).Err()
 }
 
 // Exists reports whether value for the given key exists.
@@ -261,17 +274,11 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 			return b, nil
 		}
 
-		value, err := item.Func()
-		if err != nil {
-			return nil, err
+		b, ok, err := cd.set(item)
+		if ok {
+			return b, nil
 		}
-
-		b, err = cd.set(item.Context(), item.Key, value, item.exp())
-		if err != nil {
-			return nil, err
-		}
-
-		return b, nil
+		return nil, err
 	})
 	if err != nil {
 		return nil, false, err
@@ -326,6 +333,7 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 
 	tm := decodeTime(b[len(b)-4:])
 	if time.Since(tm) > cd.opt.LocalCacheTTL {
+		cd.opt.LocalCache.Del([]byte(key))
 		return nil, false
 	}
 
