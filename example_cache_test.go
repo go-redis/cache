@@ -70,7 +70,7 @@ func Example_advancedUsage() {
 	err := mycache.Once(&cache.Item{
 		Key:   "mykey",
 		Value: obj, // destination
-		Func: func() (interface{}, error) {
+		Do: func(*cache.Item) (interface{}, error) {
 			return &Object{
 				Str: "mystring",
 				Num: 42,

@@ -22,7 +22,7 @@ func BenchmarkOnce(b *testing.B) {
 			err := mycache.Once(&cache.Item{
 				Key:   "bench-once",
 				Value: &dst,
-				Func: func() (interface{}, error) {
+				Do: func(*cache.Item) (interface{}, error) {
 					return obj, nil
 				},
 			})

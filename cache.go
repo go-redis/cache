@@ -47,8 +47,8 @@ type Item struct {
 	// Default TTL is 1 hour.
 	TTL time.Duration
 
-	// Func returns value to be cached.
-	Func func() (interface{}, error)
+	// Do returns value to be cached.
+	Do func(*Item) (interface{}, error)
 
 	// IfExists only sets the key if it already exist.
 	IfExists bool
@@ -68,8 +68,8 @@ func (item *Item) Context() context.Context {
 }
 
 func (item *Item) value() (interface{}, error) {
-	if item.Func != nil {
-		return item.Func()
+	if item.Do != nil {
+		return item.Do(item)
 	}
 	if item.Value != nil {
 		return item.Value, nil
