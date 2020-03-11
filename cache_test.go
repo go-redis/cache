@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -355,19 +355,20 @@ var _ = Describe("Cache", func() {
 })
 
 func newRing() *redis.Ring {
-	return redis.NewRing(&redis.RingOptions{
+	ctx := context.TODO()
+	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"server1": ":6379",
 		},
 	})
+	_ = ring.ForEachShard(ctx, func(ctx context.Context, client *redis.Client) error {
+		return client.FlushDB(ctx).Err()
+	})
+	return ring
 }
 
 func newCache() *cache.Cache {
 	ring := newRing()
-	_ = ring.ForEachShard(func(client *redis.Client) error {
-		return client.FlushDB().Err()
-	})
-
 	return cache.New(&cache.Options{
 		Redis: ring,
 	})
@@ -375,10 +376,6 @@ func newCache() *cache.Cache {
 
 func newCacheWithLocal() *cache.Cache {
 	ring := newRing()
-	_ = ring.ForEachShard(func(client *redis.Client) error {
-		return client.FlushDB().Err()
-	})
-
 	return cache.New(&cache.Options{
 		Redis:      ring,
 		LocalCache: fastcache.New(1 << 20),

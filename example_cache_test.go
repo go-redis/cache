@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 
 	"github.com/go-redis/cache/v8"
 )
