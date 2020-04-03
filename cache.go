@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack/v5"
 	"go4.org/syncutil/singleflight"
 )
 
@@ -336,12 +335,6 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 	return b[:len(b)-4], true
 }
 
-var encPool = sync.Pool{
-	New: func() interface{} {
-		return msgpack.NewEncoder(nil)
-	},
-}
-
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	switch value := value.(type) {
 	case nil:
@@ -352,15 +345,15 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 		return []byte(value), nil
 	}
 
-	enc := encPool.Get().(*msgpack.Encoder)
+	enc := msgpack.GetEncoder()
 
 	var buf bytes.Buffer
 	enc.Reset(&buf)
-	enc.UseCompactEncoding(true)
+	enc.UseCompactInts(true)
 
 	err := enc.Encode(value)
 
-	encPool.Put(enc)
+	msgpack.PutEncoder(enc)
 
 	if err != nil {
 		return nil, err
