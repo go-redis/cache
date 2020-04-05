@@ -1,12 +1,10 @@
 package cache
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -110,7 +108,8 @@ func (opt *Options) init() {
 type Cache struct {
 	opt *Options
 
-	group singleflight.Group
+	group   singleflight.Group
+	bufpool bufpool.Pool
 
 	hits   uint64
 	misses uint64
@@ -345,10 +344,11 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 		return []byte(value), nil
 	}
 
-	enc := msgpack.GetEncoder()
+	buf := cd.bufpool.Get()
+	defer cd.bufpool.Put(buf)
 
-	var buf bytes.Buffer
-	enc.Reset(&buf)
+	enc := msgpack.GetEncoder()
+	enc.Reset(buf)
 	enc.UseCompactInts(true)
 
 	err := enc.Encode(value)
@@ -359,14 +359,15 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	b := buf.Bytes()
-
-	if len(b) < compressionThreshold {
-		b = append(b, noCompression)
+	if buf.Len() < compressionThreshold {
+		b := make([]byte, buf.Len()+1)
+		copy(b, buf.Bytes())
+		b[len(b)-1] = noCompression
 		return b, nil
 	}
 
-	b = s2.Encode(nil, b)
+	b := make([]byte, s2.MaxEncodedLen(buf.Len())+1)
+	b = s2.Encode(b, buf.Bytes())
 	b = append(b, s2Compression)
 
 	return b, nil
@@ -381,10 +382,10 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 	case nil:
 		return nil
 	case *[]byte:
-		reflect.ValueOf(value).Elem().SetBytes(b)
+		*value = b
 		return nil
 	case *string:
-		reflect.ValueOf(value).Elem().SetString(string(b))
+		*value = string(b)
 		return nil
 	}
 
