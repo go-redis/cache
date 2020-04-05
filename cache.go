@@ -17,6 +17,7 @@ import (
 )
 
 const compressionThreshold = 64
+const timeLen = 4
 
 const (
 	noCompression = 0x0
@@ -321,17 +322,17 @@ func (cd *Cache) localGet(key string) ([]byte, bool) {
 	if len(b) == 0 || cd.opt.LocalCacheTTL == 0 {
 		return b, true
 	}
-	if len(b) < 4 {
+	if len(b) < timeLen {
 		panic("not reached")
 	}
 
-	tm := decodeTime(b[len(b)-4:])
+	tm := decodeTime(b[len(b)-timeLen:])
 	if time.Since(tm) > cd.opt.LocalCacheTTL {
 		cd.opt.LocalCache.Del([]byte(key))
 		return nil, false
 	}
 
-	return b[:len(b)-4], true
+	return b[:len(b)-timeLen], true
 }
 
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
@@ -360,13 +361,15 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	}
 
 	if buf.Len() < compressionThreshold {
-		b := make([]byte, buf.Len()+1)
+		n := buf.Len() + 1
+		b := make([]byte, n, n+timeLen)
 		copy(b, buf.Bytes())
 		b[len(b)-1] = noCompression
 		return b, nil
 	}
 
-	b := make([]byte, s2.MaxEncodedLen(buf.Len())+1)
+	n := s2.MaxEncodedLen(buf.Len()) + 1
+	b := make([]byte, n, n+timeLen)
 	b = s2.Encode(b, buf.Bytes())
 	b = append(b, s2Compression)
 
