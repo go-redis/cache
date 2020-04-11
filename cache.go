@@ -340,9 +340,9 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	case nil:
 		return nil, nil
 	case []byte:
-		return value, nil
+		return compress(value), nil
 	case string:
-		return []byte(value), nil
+		return compress([]byte(value)), nil
 	}
 
 	buf := cd.bufpool.Get()
@@ -360,38 +360,26 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	if buf.Len() < compressionThreshold {
-		n := buf.Len() + 1
+	return compress(buf.Bytes()), nil
+}
+
+func compress(data []byte) []byte {
+	if len(data) < compressionThreshold {
+		n := len(data) + 1
 		b := make([]byte, n, n+timeLen)
-		copy(b, buf.Bytes())
+		copy(b, data)
 		b[len(b)-1] = noCompression
-		return b, nil
+		return b
 	}
 
-	n := s2.MaxEncodedLen(buf.Len()) + 1
+	n := s2.MaxEncodedLen(len(data)) + 1
 	b := make([]byte, n, n+timeLen)
-	b = s2.Encode(b, buf.Bytes())
+	b = s2.Encode(b, data)
 	b = append(b, s2Compression)
-
-	return b, nil
+	return b
 }
 
 func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
-	if len(b) == 0 {
-		return nil
-	}
-
-	switch value := value.(type) {
-	case nil:
-		return nil
-	case *[]byte:
-		*value = b
-		return nil
-	case *string:
-		*value = string(b)
-		return nil
-	}
-
 	if len(b) == 0 {
 		return nil
 	}
@@ -415,10 +403,23 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("uknownn compression method: %x", c)
+		return fmt.Errorf("unknown compression method: %x", c)
 	}
 
-	return msgpack.Unmarshal(b, value)
+	switch value := value.(type) {
+	case nil:
+		return nil
+	case *[]byte:
+		clone := make([]byte, len(b))
+		copy(clone, b)
+		*value = clone
+		return nil
+	case *string:
+		*value = string(b)
+		return nil
+	default:
+		return msgpack.Unmarshal(b, value)
+	}
 }
 
 //------------------------------------------------------------------------------
