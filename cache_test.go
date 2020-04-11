@@ -44,6 +44,7 @@ var _ = Describe("Cache", func() {
 	const key = "mykey"
 	var obj *Object
 
+	var rdb *redis.Ring
 	var mycache *cache.Cache
 
 	testCache := func() {
@@ -126,6 +127,25 @@ var _ = Describe("Cache", func() {
 			err = mycache.Get(ctx, key, &dst)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(dst).To(Equal(value))
+		})
+
+		It("can be used with Incr", func() {
+			if rdb == nil {
+				return
+			}
+
+			value := "123"
+
+			err := mycache.Set(&cache.Item{
+				Ctx:   ctx,
+				Key:   key,
+				Value: value,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			n, err := rdb.Incr(ctx, key).Result()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(n).To(Equal(int64(124)))
 		})
 
 		Describe("Once func", func() {
@@ -329,7 +349,8 @@ var _ = Describe("Cache", func() {
 
 	Context("without LocalCache", func() {
 		BeforeEach(func() {
-			mycache = newCache()
+			rdb = newRing()
+			mycache = newCache(rdb)
 		})
 
 		testCache()
@@ -337,7 +358,8 @@ var _ = Describe("Cache", func() {
 
 	Context("with LocalCache", func() {
 		BeforeEach(func() {
-			mycache = newCacheWithLocal()
+			rdb = newRing()
+			mycache = newCacheWithLocal(rdb)
 		})
 
 		testCache()
@@ -345,6 +367,7 @@ var _ = Describe("Cache", func() {
 
 	Context("with LocalCache and without Redis", func() {
 		BeforeEach(func() {
+			rdb = nil
 			mycache = cache.New(&cache.Options{
 				LocalCache: fastcache.New(1 << 20),
 			})
@@ -367,17 +390,15 @@ func newRing() *redis.Ring {
 	return ring
 }
 
-func newCache() *cache.Cache {
-	ring := newRing()
+func newCache(rdb *redis.Ring) *cache.Cache {
 	return cache.New(&cache.Options{
-		Redis: ring,
+		Redis: rdb,
 	})
 }
 
-func newCacheWithLocal() *cache.Cache {
-	ring := newRing()
+func newCacheWithLocal(rdb *redis.Ring) *cache.Cache {
 	return cache.New(&cache.Options{
-		Redis:      ring,
+		Redis:      rdb,
 		LocalCache: fastcache.New(1 << 20),
 	})
 }

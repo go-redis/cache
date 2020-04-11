@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkOnce(b *testing.B) {
-	mycache := newCacheWithLocal()
+	mycache := newCacheWithLocal(newRing())
 	obj := &Object{
 		Str: strings.Repeat("my very large string", 10),
 		Num: 42,
@@ -37,7 +37,7 @@ func BenchmarkOnce(b *testing.B) {
 }
 
 func BenchmarkSet(b *testing.B) {
-	mycache := newCacheWithLocal()
+	mycache := newCacheWithLocal(newRing())
 	obj := &Object{
 		Str: strings.Repeat("my very large string", 10),
 		Num: 42,

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -80,7 +81,8 @@ func (item *Item) ttl() time.Duration {
 	if item.TTL < 0 {
 		return 0
 	}
-	if item.TTL < time.Second {
+	if item.TTL != 0 && item.TTL < time.Second {
+		log.Printf("too short TTL for key=%q: %s", item.Key, item.TTL)
 		return time.Hour
 	}
 	return item.TTL
@@ -340,9 +342,9 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	case nil:
 		return nil, nil
 	case []byte:
-		return compress(value), nil
+		return value, nil
 	case string:
-		return compress([]byte(value)), nil
+		return []byte(value), nil
 	}
 
 	buf := cd.bufpool.Get()
@@ -384,6 +386,19 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 		return nil
 	}
 
+	switch value := value.(type) {
+	case nil:
+		return nil
+	case *[]byte:
+		clone := make([]byte, len(b))
+		copy(clone, b)
+		*value = clone
+		return nil
+	case *string:
+		*value = string(b)
+		return nil
+	}
+
 	switch c := b[len(b)-1]; c {
 	case noCompression:
 		b = b[:len(b)-1]
@@ -406,20 +421,7 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 		return fmt.Errorf("unknown compression method: %x", c)
 	}
 
-	switch value := value.(type) {
-	case nil:
-		return nil
-	case *[]byte:
-		clone := make([]byte, len(b))
-		copy(clone, b)
-		*value = clone
-		return nil
-	case *string:
-		*value = string(b)
-		return nil
-	default:
-		return msgpack.Unmarshal(b, value)
-	}
+	return msgpack.Unmarshal(b, value)
 }
 
 //------------------------------------------------------------------------------
