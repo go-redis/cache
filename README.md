@@ -44,12 +44,8 @@ func Example_basicUsage() {
 	codec := &cache.Codec{
 		Redis: ring,
 
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
+		Marshal: msgpack.Marshal,
+		Unmarshal: msgpack.Unmarshal,
 	}
 
 	key := "mykey"
@@ -83,12 +79,8 @@ func Example_advancedUsage() {
 	codec := &cache.Codec{
 		Redis: ring,
 
-		Marshal: func(v interface{}) ([]byte, error) {
-			return msgpack.Marshal(v)
-		},
-		Unmarshal: func(b []byte, v interface{}) error {
-			return msgpack.Unmarshal(b, v)
-		},
+		Marshal: msgpack.Marshal,
+		Unmarshal: msgpack.Unmarshal,
 	}
 
 	obj := new(Object)
