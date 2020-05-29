@@ -295,14 +295,8 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 		return nil
 	}
 
-	deleted, err := cd.opt.Redis.Del(ctx, key).Result()
-	if err != nil {
-		return err
-	}
-	if deleted == 0 {
-		return ErrCacheMiss
-	}
-	return nil
+	_, err := cd.opt.Redis.Del(ctx, key).Result()
+	return err
 }
 
 func (cd *Cache) localSet(key string, b []byte) {
