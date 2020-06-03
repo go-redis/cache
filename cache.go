@@ -14,7 +14,7 @@ import (
 	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
 	"github.com/vmihailenco/msgpack/v5"
-	"go4.org/syncutil/singleflight"
+	"golang.org/x/sync/singleflight"
 )
 
 const compressionThreshold = 64
@@ -264,7 +264,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 		}
 	}
 
-	v, err := cd.group.Do(item.Key, func() (interface{}, error) {
+	v, err, _ := cd.group.Do(item.Key, func() (interface{}, error) {
 		b, err := cd.getBytes(item.Context(), item.Key, item.SkipLocalCache)
 		if err == nil {
 			cached = true
