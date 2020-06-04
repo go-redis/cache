@@ -14,7 +14,7 @@ import (
 	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
 	"github.com/vmihailenco/msgpack/v5"
-	"go4.org/syncutil/singleflight"
+	"golang.org/x/sync/singleflight"
 )
 
 const compressionThreshold = 64
@@ -264,7 +264,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 		}
 	}
 
-	v, err := cd.group.Do(item.Key, func() (interface{}, error) {
+	v, err, _ := cd.group.Do(item.Key, func() (interface{}, error) {
 		b, err := cd.getBytes(item.Context(), item.Key, item.SkipLocalCache)
 		if err == nil {
 			cached = true
@@ -347,6 +347,7 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	enc := msgpack.GetEncoder()
 	enc.Reset(buf)
 	enc.UseCompactInts(true)
+	enc.UseJSONTag(true)
 
 	err := enc.Encode(value)
 
@@ -415,7 +416,22 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 		return fmt.Errorf("unknown compression method: %x", c)
 	}
 
-	return msgpack.Unmarshal(b, value)
+	return unmarshal(b, value)
+}
+
+// modified from github.com/vmihailenco/msgpack/v5@v5.0.0-alpha.2/decode.go:Unmarshal
+//
+// add dec.UseJSONTag(true)
+func unmarshal(data []byte, v interface{}) error {
+	dec := msgpack.GetDecoder()
+
+	dec.ResetBytes(data)
+	dec.UseJSONTag(true)
+	err := dec.Decode(v)
+
+	msgpack.PutDecoder(dec)
+
+	return err
 }
 
 //------------------------------------------------------------------------------
