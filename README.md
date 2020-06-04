@@ -1,103 +1,107 @@
 # Redis cache library for Golang
 
 [![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
-[![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://godoc.org/github.com/go-redis/cache)
+[![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://pkg.go.dev/github.com/go-redis/cache/v8?tab=doc)
+
+## Sponsors
+
+- [**Uptrace.dev** - distributed traces and metrics](https://uptrace.dev)
 
 ## Installation
 
 go-redis/cache requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installation:
 
-``` shell
+```shell
 go mod init github.com/my/repo
-go get -u github.com/go-redis/cache/v7
+go get -u github.com/go-redis/cache/v8
 ```
 
 ## Quickstart
 
-
-``` go
+```go
 package cache_test
 
 import (
-	"fmt"
-	"time"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/go-redis/redis/v7"
-	"github.com/vmihailenco/msgpack/v4"
+    "github.com/VictoriaMetrics/fastcache"
+    "github.com/go-redis/redis/v8"
 
-	"github.com/go-redis/cache/v7"
+    "github.com/go-redis/cache/v8"
 )
 
 type Object struct {
-	Str string
-	Num int
+    Str string
+    Num int
 }
 
 func Example_basicUsage() {
-	ring := redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{
-			"server1": ":6379",
-			"server2": ":6380",
-		},
-	})
+    ring := redis.NewRing(&redis.RingOptions{
+        Addrs: map[string]string{
+            "server1": ":6379",
+            "server2": ":6380",
+        },
+    })
 
-	codec := &cache.Codec{
-		Redis: ring,
+    mycache := cache.New(&cache.Options{
+        Redis:      ring,
+        LocalCache: fastcache.New(100 << 20), // 100 MB
+    })
 
-		Marshal: msgpack.Marshal,
-		Unmarshal: msgpack.Unmarshal,
-	}
+    ctx := context.TODO()
+    key := "mykey"
+    obj := &Object{
+        Str: "mystring",
+        Num: 42,
+    }
 
-	key := "mykey"
-	obj := &Object{
-		Str: "mystring",
-		Num: 42,
-	}
+    if err := mycache.Set(&cache.Item{
+        Ctx:   ctx,
+        Key:   key,
+        Value: obj,
+        TTL:   time.Hour,
+    }); err != nil {
+        panic(err)
+    }
 
-	codec.Set(&cache.Item{
-		Key:        key,
-		Object:     obj,
-		Expiration: time.Hour,
-	})
+    var wanted Object
+    if err := mycache.Get(ctx, key, &wanted); err == nil {
+        fmt.Println(wanted)
+    }
 
-	var wanted Object
-	if err := codec.Get(key, &wanted); err == nil {
-		fmt.Println(wanted)
-	}
-
-	// Output: {mystring 42}
+    // Output: {mystring 42}
 }
 
 func Example_advancedUsage() {
-	ring := redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{
-			"server1": ":6379",
-			"server2": ":6380",
-		},
-	})
+    ring := redis.NewRing(&redis.RingOptions{
+        Addrs: map[string]string{
+            "server1": ":6379",
+            "server2": ":6380",
+        },
+    })
 
-	codec := &cache.Codec{
-		Redis: ring,
+    mycache := cache.New(&cache.Options{
+        Redis:      ring,
+        LocalCache: fastcache.New(100 << 20), // 100 MB
+    })
 
-		Marshal: msgpack.Marshal,
-		Unmarshal: msgpack.Unmarshal,
-	}
-
-	obj := new(Object)
-	err := codec.Once(&cache.Item{
-		Key:    "mykey",
-		Object: obj, // destination
-		Func: func() (interface{}, error) {
-			return &Object{
-				Str: "mystring",
-				Num: 42,
-			}, nil
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(obj)
-	// Output: &{mystring 42}
+    obj := new(Object)
+    err := mycache.Once(&cache.Item{
+        Key:   "mykey",
+        Value: obj, // destination
+        Do: func(*cache.Item) (interface{}, error) {
+            return &Object{
+                Str: "mystring",
+                Num: 42,
+            }, nil
+        },
+    })
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(obj)
+    // Output: &{mystring 42}
 }
 ```
