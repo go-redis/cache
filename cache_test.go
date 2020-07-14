@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VictoriaMetrics/fastcache"
 	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/vmihailenco/go-tinylfu"
 
 	"github.com/go-redis/cache/v8"
 )
@@ -369,7 +369,7 @@ var _ = Describe("Cache", func() {
 		BeforeEach(func() {
 			rdb = nil
 			mycache = cache.New(&cache.Options{
-				LocalCache: fastcache.New(1 << 20),
+				LocalCache: tinylfu.NewSync(1000, 10000),
 			})
 		})
 
@@ -399,6 +399,6 @@ func newCache(rdb *redis.Ring) *cache.Cache {
 func newCacheWithLocal(rdb *redis.Ring) *cache.Cache {
 	return cache.New(&cache.Options{
 		Redis:      rdb,
-		LocalCache: fastcache.New(1 << 20),
+		LocalCache: tinylfu.NewSync(1000, 10000),
 	})
 }

@@ -2,17 +2,17 @@ package cache
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"sync/atomic"
 	"time"
 
-	"github.com/VictoriaMetrics/fastcache"
+	"github.com/cespare/xxhash/v2"
 	"github.com/go-redis/redis/v8"
 	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
+	"github.com/vmihailenco/go-tinylfu"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/sync/singleflight"
 )
@@ -93,7 +93,7 @@ func (item *Item) ttl() time.Duration {
 type Options struct {
 	Redis rediser
 
-	LocalCache    *fastcache.Cache
+	LocalCache    *tinylfu.SyncT
 	LocalCacheTTL time.Duration
 
 	StatsEnabled bool
@@ -285,7 +285,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 
 func (cd *Cache) Delete(ctx context.Context, key string) error {
 	if cd.opt.LocalCache != nil {
-		cd.opt.LocalCache.Del([]byte(key))
+		cd.opt.LocalCache.Del(xxhash.Sum64String(key))
 	}
 
 	if cd.opt.Redis == nil {
@@ -300,35 +300,21 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 }
 
 func (cd *Cache) localSet(key string, b []byte) {
-	if cd.opt.LocalCacheTTL > 0 {
-		pos := len(b)
-		b = append(b, make([]byte, 4)...)
-		encodeTime(b[pos:], time.Now())
-	}
-
-	cd.opt.LocalCache.Set([]byte(key), b)
+	cd.opt.LocalCache.Set(&tinylfu.Item{
+		Key:      xxhash.Sum64String(key),
+		Value:    b,
+		ExpireAt: time.Now().Add(cd.opt.LocalCacheTTL),
+	})
 }
 
 func (cd *Cache) localGet(key string) ([]byte, bool) {
-	b, ok := cd.opt.LocalCache.HasGet(nil, []byte(key))
+	val, ok := cd.opt.LocalCache.Get(xxhash.Sum64String(key))
 	if !ok {
-		return b, false
-	}
-
-	if len(b) == 0 || cd.opt.LocalCacheTTL == 0 {
-		return b, true
-	}
-	if len(b) < timeLen {
-		panic("not reached")
-	}
-
-	tm := decodeTime(b[len(b)-timeLen:])
-	if time.Since(tm) > cd.opt.LocalCacheTTL {
-		cd.opt.LocalCache.Del([]byte(key))
 		return nil, false
 	}
 
-	return b[:len(b)-timeLen], true
+	b := val.([]byte)
+	return b, true
 }
 
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
@@ -450,18 +436,4 @@ func (cd *Cache) Stats() *Stats {
 		Hits:   atomic.LoadUint64(&cd.hits),
 		Misses: atomic.LoadUint64(&cd.misses),
 	}
-}
-
-//------------------------------------------------------------------------------
-
-var epoch = time.Date(2020, time.January, 01, 00, 0, 0, 0, time.UTC).Unix()
-
-func encodeTime(b []byte, tm time.Time) {
-	secs := tm.Unix() - epoch
-	binary.LittleEndian.PutUint32(b, uint32(secs))
-}
-
-func decodeTime(b []byte) time.Time {
-	secs := binary.LittleEndian.Uint32(b)
-	return time.Unix(int64(secs)+epoch, 0)
 }
