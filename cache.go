@@ -17,16 +17,20 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const compressionThreshold = 64
-const timeLen = 4
+const (
+	compressionThreshold = 64
+	timeLen              = 4
+)
 
 const (
 	noCompression = 0x0
 	s2Compression = 0x1
 )
 
-var ErrCacheMiss = errors.New("cache: key is missing")
-var errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+var (
+	ErrCacheMiss          = errors.New("cache: key is missing")
+	errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+)
 
 type rediser interface {
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
@@ -333,7 +337,6 @@ func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	enc := msgpack.GetEncoder()
 	enc.Reset(buf)
 	enc.UseCompactInts(true)
-	enc.UseJSONTag(true)
 
 	err := enc.Encode(value)
 
