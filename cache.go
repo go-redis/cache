@@ -405,18 +405,10 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 		return fmt.Errorf("unknown compression method: %x", c)
 	}
 
-	return unmarshal(b, value)
-}
-
-// modified from github.com/vmihailenco/msgpack/v5@v5.0.0-alpha.2/decode.go:Unmarshal
-//
-// add dec.UseJSONTag(true)
-func unmarshal(data []byte, v interface{}) error {
 	dec := msgpack.GetDecoder()
 
-	dec.ResetBytes(data)
-	dec.UseJSONTag(true)
-	err := dec.Decode(v)
+	dec.ResetBytes(b)
+	err := dec.Decode(value)
 
 	msgpack.PutDecoder(dec)
 
