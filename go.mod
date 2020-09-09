@@ -11,7 +11,7 @@ require (
 	github.com/klauspost/compress v1.11.0
 	github.com/mmcloughlin/avo v0.0.0-20200523190732-4439b6b2c061 // indirect
 	github.com/onsi/ginkgo v1.14.1
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/gomega v1.10.2
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/vmihailenco/bufpool v0.1.11
 	github.com/vmihailenco/go-tinylfu v0.0.0-20200714092347-120b932f0a08
