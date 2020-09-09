@@ -5,8 +5,7 @@ go 1.13
 require (
 	github.com/cespare/xxhash/v2 v2.1.1
 	github.com/go-redis/redis/v8 v8.0.0-beta.6
-	github.com/golang/protobuf v1.4.2 // indirect
-	github.com/klauspost/compress v1.10.10
+	github.com/klauspost/compress v1.11.0
 	github.com/mmcloughlin/avo v0.0.0-20200523190732-4439b6b2c061 // indirect
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
