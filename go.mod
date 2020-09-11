@@ -6,7 +6,7 @@ require (
 	github.com/DataDog/sketches-go v0.0.0-20190923095040-43f19ad77ff7 // indirect
 	github.com/benbjohnson/clock v1.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1
-	github.com/go-redis/redis/v8 v8.0.0-beta.11
+	github.com/go-redis/redis/v8 v8.0.0-beta.12
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/klauspost/compress v1.11.0
 	github.com/mmcloughlin/avo v0.0.0-20200523190732-4439b6b2c061 // indirect
