@@ -33,9 +33,9 @@ var (
 )
 
 type rediser interface {
-	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
-	SetXX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd
-	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.BoolCmd
+	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.StatusCmd
+	SetXX(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.BoolCmd
+	SetNX(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.BoolCmd
 
 	Get(ctx context.Context, key string) *redis.StringCmd
 	Del(ctx context.Context, keys ...string) *redis.IntCmd
@@ -54,11 +54,11 @@ type Item struct {
 	// Do returns value to be cached.
 	Do func(*Item) (interface{}, error)
 
-	// IfExists only sets the key if it already exist.
-	IfExists bool
+	// SetXX only sets the key if it already exists.
+	SetXX bool
 
-	// IfNotExists only sets the key if it does not already exist.
-	IfNotExists bool
+	// SetNX only sets the key if it does not already exist.
+	SetNX bool
 
 	// SkipLocalCache skips local cache as if it is not set.
 	SkipLocalCache bool
@@ -157,11 +157,11 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 		return b, true, nil
 	}
 
-	if item.IfExists {
+	if item.SetXX {
 		return b, true, cd.opt.Redis.SetXX(item.Context(), item.Key, b, item.ttl()).Err()
 	}
 
-	if item.IfNotExists {
+	if item.SetNX {
 		return b, true, cd.opt.Redis.SetNX(item.Context(), item.Key, b, item.ttl()).Err()
 	}
 
