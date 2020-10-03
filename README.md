@@ -45,7 +45,7 @@ func Example_basicUsage() {
 
     mycache := cache.New(&cache.Options{
         Redis:      ring,
-        LocalCache: fastcache.New(100 << 20), // 100 MB
+        LocalCache: tinylfu.NewSync(10000, 100000),
     })
 
     ctx := context.TODO()
@@ -82,7 +82,7 @@ func Example_advancedUsage() {
 
     mycache := cache.New(&cache.Options{
         Redis:      ring,
-        LocalCache: fastcache.New(100 << 20), // 100 MB
+        LocalCache: tinylfu.NewSync(10000, 100000),
     })
 
     obj := new(Object)
