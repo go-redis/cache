@@ -24,7 +24,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/VictoriaMetrics/fastcache"
+    "github.com/vmihailenco/go-tinylfu"
     "github.com/go-redis/redis/v8"
 
     "github.com/go-redis/cache/v8"
