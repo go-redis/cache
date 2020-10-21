@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
+	"github.com/cespare/xxhash/v2"
 	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,6 +47,9 @@ var _ = Describe("Cache", func() {
 	var obj *Object
 
 	var rdb *redis.Ring
+	var localCache *tinylfu.SyncT
+	var localCacheTTL time.Duration = time.Minute
+	var localCacheTTLOffset time.Duration
 	var mycache *cache.Cache
 
 	testCache := func() {
@@ -95,6 +100,17 @@ var _ = Describe("Cache", func() {
 			Expect(wanted).To(Equal(obj))
 
 			Expect(mycache.Exists(ctx, key)).To(BeTrue())
+
+			if localCache != nil {
+				_, existsInLocalCache := localCache.Get(xxhash.Sum64String(key))
+				Expect(existsInLocalCache).To(BeTrue())
+
+				later := time.Now().Add(localCacheTTL + localCacheTTLOffset)
+				patch := monkey.Patch(time.Now, func() time.Time { return later })
+				defer patch.Unpatch()
+				_, existsInLocalCache = localCache.Get(xxhash.Sum64String(key))
+				Expect(existsInLocalCache).To(BeFalse())
+			}
 		})
 
 		It("Sets string as is", func() {
@@ -359,7 +375,44 @@ var _ = Describe("Cache", func() {
 	Context("with LocalCache", func() {
 		BeforeEach(func() {
 			rdb = newRing()
-			mycache = newCacheWithLocal(rdb)
+			localCache = tinylfu.NewSync(1000, 10000)
+			mycache = cache.New(&cache.Options{
+				Redis:      rdb,
+				LocalCache: localCache,
+			})
+		})
+
+		testCache()
+	})
+
+	Context("with LocalCache and different ttl values", func() {
+		BeforeEach(func() {
+			rdb = newRing()
+			localCache = tinylfu.NewSync(1000, 10000)
+			localCacheTTL = 5 * time.Minute
+			mycache = cache.New(&cache.Options{
+				Redis:               rdb,
+				LocalCache:          localCache,
+				LocalCacheTTL:       localCacheTTL,
+				LocalCacheTTLOffset: localCacheTTLOffset,
+			})
+		})
+
+		testCache()
+	})
+
+	Context("with LocalCache, different ttl, and stagger offset value", func() {
+		BeforeEach(func() {
+			rdb = newRing()
+			localCache = tinylfu.NewSync(1000, 10000)
+			localCacheTTL = 5 * time.Minute
+			localCacheTTLOffset = 1 * time.Minute
+			mycache = cache.New(&cache.Options{
+				Redis:               rdb,
+				LocalCache:          localCache,
+				LocalCacheTTL:       localCacheTTL,
+				LocalCacheTTLOffset: localCacheTTLOffset,
+			})
 		})
 
 		testCache()
@@ -368,8 +421,9 @@ var _ = Describe("Cache", func() {
 	Context("with LocalCache and without Redis", func() {
 		BeforeEach(func() {
 			rdb = nil
+			localCache = tinylfu.NewSync(1000, 10000)
 			mycache = cache.New(&cache.Options{
-				LocalCache: tinylfu.NewSync(1000, 10000),
+				LocalCache: localCache,
 			})
 		})
 

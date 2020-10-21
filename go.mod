@@ -3,6 +3,7 @@ module github.com/go-redis/cache/v8
 go 1.13
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/cespare/xxhash/v2 v2.1.1
 	github.com/go-redis/redis/v8 v8.2.3
 	github.com/klauspost/compress v1.11.1

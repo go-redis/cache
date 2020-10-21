@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync/atomic"
 	"time"
 
@@ -26,6 +27,10 @@ const (
 	noCompression = 0x0
 	s2Compression = 0x1
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 var (
 	ErrCacheMiss          = errors.New("cache: key is missing")
@@ -97,8 +102,9 @@ func (item *Item) ttl() time.Duration {
 type Options struct {
 	Redis rediser
 
-	LocalCache    *tinylfu.SyncT
-	LocalCacheTTL time.Duration
+	LocalCache          *tinylfu.SyncT // Optional, if initialized get value would be locally cached.
+	LocalCacheTTL       time.Duration  // Optional, if set local cache will use this value, defaults to 1m.
+	LocalCacheTTLOffset time.Duration  // Optional, if set local cache ttl will be staggered around this value.
 
 	StatsEnabled bool
 }
@@ -109,6 +115,10 @@ func (opt *Options) init() {
 		opt.LocalCacheTTL = 0
 	case 0:
 		opt.LocalCacheTTL = time.Minute
+	}
+
+	if opt.LocalCacheTTL < opt.LocalCacheTTLOffset {
+		panic("value for local cache's ttl should be larger than stagger offset")
 	}
 }
 
@@ -304,10 +314,16 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 }
 
 func (cd *Cache) localSet(key string, b []byte) {
+	ttl := cd.opt.LocalCacheTTL
+	if ttl > 0 && cd.opt.LocalCacheTTLOffset > 0 {
+		ttl = ttl - cd.opt.LocalCacheTTLOffset +
+			time.Duration(rand.Int63n(2*int64(cd.opt.LocalCacheTTLOffset)))
+	}
+
 	cd.opt.LocalCache.Set(&tinylfu.Item{
 		Key:      xxhash.Sum64String(key),
 		Value:    b,
-		ExpireAt: time.Now().Add(cd.opt.LocalCacheTTL),
+		ExpireAt: time.Now().Add(ttl),
 	})
 }
 
