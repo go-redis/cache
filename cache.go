@@ -407,7 +407,7 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 
 	dec := msgpack.GetDecoder()
 
-	dec.ResetBytes(b)
+	dec.ResetReader(b)
 	err := dec.Decode(value)
 
 	msgpack.PutDecoder(dec)
