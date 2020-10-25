@@ -405,14 +405,7 @@ func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
 		return fmt.Errorf("unknown compression method: %x", c)
 	}
 
-	dec := msgpack.GetDecoder()
-
-	dec.ResetReader(b)
-	err := dec.Decode(value)
-
-	msgpack.PutDecoder(dec)
-
-	return err
+	return msgpack.Unmarshal(b, value)
 }
 
 //------------------------------------------------------------------------------
