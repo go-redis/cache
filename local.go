@@ -1,10 +1,12 @@
 package cache
 
 import (
+	"sync"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/vmihailenco/go-tinylfu"
+	"golang.org/x/exp/rand"
 )
 
 type LocalCache interface {
@@ -14,28 +16,55 @@ type LocalCache interface {
 }
 
 type TinyLFU struct {
-	lfu *tinylfu.SyncT
-	ttl time.Duration
+	mu     sync.Mutex
+	rand   *rand.Rand
+	lfu    *tinylfu.T
+	ttl    time.Duration
+	offset time.Duration
 }
 
 var _ LocalCache = (*TinyLFU)(nil)
 
 func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
+	const maxOffset = 10 * time.Second
+
+	offset := ttl / 10
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+
 	return &TinyLFU{
-		lfu: tinylfu.NewSync(size, 100000),
-		ttl: ttl,
+		rand:   rand.New(rand.NewSource(uint64(time.Now().UnixNano()))),
+		lfu:    tinylfu.New(size, 100000),
+		ttl:    ttl,
+		offset: offset,
 	}
 }
 
+func (c *TinyLFU) UseRandomizedTTL(offset time.Duration) {
+	c.offset = offset
+}
+
 func (c *TinyLFU) Set(key string, b []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ttl := c.ttl
+	if c.offset > 0 {
+		ttl += time.Duration(c.rand.Int63n(int64(c.offset)))
+	}
+
 	c.lfu.Set(&tinylfu.Item{
 		Key:      xxhash.Sum64String(key),
 		Value:    b,
-		ExpireAt: time.Now().Add(c.ttl),
+		ExpireAt: time.Now().Add(ttl),
 	})
 }
 
 func (c *TinyLFU) Get(key string) ([]byte, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	val, ok := c.lfu.Get(xxhash.Sum64String(key))
 	if !ok {
 		return nil, false
@@ -46,5 +75,8 @@ func (c *TinyLFU) Get(key string) ([]byte, bool) {
 }
 
 func (c *TinyLFU) Del(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.lfu.Del(xxhash.Sum64String(key))
 }
