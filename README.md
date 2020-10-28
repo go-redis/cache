@@ -24,9 +24,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/vmihailenco/go-tinylfu"
     "github.com/go-redis/redis/v8"
-
     "github.com/go-redis/cache/v8"
 )
 
@@ -45,7 +43,7 @@ func Example_basicUsage() {
 
     mycache := cache.New(&cache.Options{
         Redis:      ring,
-        LocalCache: tinylfu.NewSync(10000, 100000),
+        LocalCache: cache.NewTinyLFU(1000, time.Minute),
     })
 
     ctx := context.TODO()
@@ -82,7 +80,7 @@ func Example_advancedUsage() {
 
     mycache := cache.New(&cache.Options{
         Redis:      ring,
-        LocalCache: tinylfu.NewSync(10000, 100000),
+        LocalCache: cache.NewTinyLFU(1000, time.Minute),
     })
 
     obj := new(Object)

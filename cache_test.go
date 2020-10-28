@@ -12,7 +12,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/vmihailenco/go-tinylfu"
 
 	"github.com/go-redis/cache/v8"
 )
@@ -369,7 +368,7 @@ var _ = Describe("Cache", func() {
 		BeforeEach(func() {
 			rdb = nil
 			mycache = cache.New(&cache.Options{
-				LocalCache: tinylfu.NewSync(1000, 10000),
+				LocalCache: cache.NewTinyLFU(1000, time.Minute),
 			})
 		})
 
@@ -399,6 +398,6 @@ func newCache(rdb *redis.Ring) *cache.Cache {
 func newCacheWithLocal(rdb *redis.Ring) *cache.Cache {
 	return cache.New(&cache.Options{
 		Redis:      rdb,
-		LocalCache: tinylfu.NewSync(1000, 10000),
+		LocalCache: cache.NewTinyLFU(1000, time.Minute),
 	})
 }

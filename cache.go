@@ -8,11 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/go-redis/redis/v8"
 	"github.com/klauspost/compress/s2"
 	"github.com/vmihailenco/bufpool"
-	"github.com/vmihailenco/go-tinylfu"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/sync/singleflight"
 )
@@ -95,21 +93,9 @@ func (item *Item) ttl() time.Duration {
 //------------------------------------------------------------------------------
 
 type Options struct {
-	Redis rediser
-
-	LocalCache    *tinylfu.SyncT
-	LocalCacheTTL time.Duration
-
+	Redis        rediser
+	LocalCache   LocalCache
 	StatsEnabled bool
-}
-
-func (opt *Options) init() {
-	switch opt.LocalCacheTTL {
-	case -1:
-		opt.LocalCacheTTL = 0
-	case 0:
-		opt.LocalCacheTTL = time.Minute
-	}
 }
 
 type Cache struct {
@@ -123,7 +109,6 @@ type Cache struct {
 }
 
 func New(opt *Options) *Cache {
-	opt.init()
 	return &Cache{
 		opt: opt,
 	}
@@ -147,7 +132,7 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 	}
 
 	if cd.opt.LocalCache != nil {
-		cd.localSet(item.Key, b)
+		cd.opt.LocalCache.Set(item.Key, b)
 	}
 
 	if cd.opt.Redis == nil {
@@ -200,7 +185,7 @@ func (cd *Cache) get(
 
 func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) ([]byte, error) {
 	if !skipLocalCache && cd.opt.LocalCache != nil {
-		b, ok := cd.localGet(key)
+		b, ok := cd.opt.LocalCache.Get(key)
 		if ok {
 			return b, nil
 		}
@@ -229,7 +214,7 @@ func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) 
 	}
 
 	if !skipLocalCache && cd.opt.LocalCache != nil {
-		cd.localSet(key, b)
+		cd.opt.LocalCache.Set(key, b)
 	}
 	return b, nil
 }
@@ -262,7 +247,7 @@ func (cd *Cache) Once(item *Item) error {
 
 func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
 	if cd.opt.LocalCache != nil {
-		b, ok := cd.localGet(item.Key)
+		b, ok := cd.opt.LocalCache.Get(item.Key)
 		if ok {
 			return b, true, nil
 		}
@@ -289,7 +274,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 
 func (cd *Cache) Delete(ctx context.Context, key string) error {
 	if cd.opt.LocalCache != nil {
-		cd.opt.LocalCache.Del(xxhash.Sum64String(key))
+		cd.opt.LocalCache.Del(key)
 	}
 
 	if cd.opt.Redis == nil {
@@ -301,24 +286,6 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 
 	_, err := cd.opt.Redis.Del(ctx, key).Result()
 	return err
-}
-
-func (cd *Cache) localSet(key string, b []byte) {
-	cd.opt.LocalCache.Set(&tinylfu.Item{
-		Key:      xxhash.Sum64String(key),
-		Value:    b,
-		ExpireAt: time.Now().Add(cd.opt.LocalCacheTTL),
-	})
-}
-
-func (cd *Cache) localGet(key string) ([]byte, bool) {
-	val, ok := cd.opt.LocalCache.Get(xxhash.Sum64String(key))
-	if !ok {
-		return nil, false
-	}
-
-	b := val.([]byte)
-	return b, true
 }
 
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
