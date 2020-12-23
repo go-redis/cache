@@ -131,7 +131,7 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 		return nil, false, err
 	}
 
-	if cd.opt.LocalCache != nil {
+	if cd.opt.LocalCache != nil && !item.SkipLocalCache {
 		cd.opt.LocalCache.Set(item.Key, b)
 	}
 
