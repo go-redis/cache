@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/vmihailenco/go-tinylfu"
 	"golang.org/x/exp/rand"
 )
@@ -55,7 +54,7 @@ func (c *TinyLFU) Set(key string, b []byte) {
 	}
 
 	c.lfu.Set(&tinylfu.Item{
-		Key:      xxhash.Sum64String(key),
+		Key:      key,
 		Value:    b,
 		ExpireAt: time.Now().Add(ttl),
 	})
@@ -65,7 +64,7 @@ func (c *TinyLFU) Get(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	val, ok := c.lfu.Get(xxhash.Sum64String(key))
+	val, ok := c.lfu.Get(key)
 	if !ok {
 		return nil, false
 	}
@@ -78,5 +77,5 @@ func (c *TinyLFU) Del(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.lfu.Del(xxhash.Sum64String(key))
+	c.lfu.Del(key)
 }

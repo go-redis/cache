@@ -66,8 +66,8 @@ github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/vmihailenco/bufpool v0.1.11 h1:gOq2WmBrq0i2yW5QJ16ykccQ4wH9UyEsgLm6czKAd94=
 github.com/vmihailenco/bufpool v0.1.11/go.mod h1:AFf/MOy3l2CFTKbxwt0mp2MwnqjNEs5H/UxrkA5jxTQ=
-github.com/vmihailenco/go-tinylfu v0.1.0 h1:wNwKigNq50gfiyQDPpseEuGK4TZtFyjduJSg0M6gBns=
-github.com/vmihailenco/go-tinylfu v0.1.0/go.mod h1:qZbD6U3F10Sfuxyy4c5wMq5CM4/t5I3eJJS9yMQoXU0=
+github.com/vmihailenco/go-tinylfu v0.2.0 h1:gRe/WurdOHaNrayn1anyWOgLkeC8xf0234kyLvkQWxM=
+github.com/vmihailenco/go-tinylfu v0.2.0/go.mod h1:BLjA2pesPf7BH0jjFgrgB9uEgekHC4p9i8378iKOvdk=
 github.com/vmihailenco/msgpack/v5 v5.1.0 h1:+od5YbEXxW95SPlW6beocmt8nOtlh83zqat5Ip9Hwdc=
 github.com/vmihailenco/msgpack/v5 v5.1.0/go.mod h1:C5gboKD0TJPqWDTVTtrQNfRbiBwHZGo8UTqP/9/XvLI=
 github.com/vmihailenco/tagparser v0.1.2 h1:gnjoVuB/kljJ5wICEEOpx98oXMWPLj22G67Vbd1qPqc=

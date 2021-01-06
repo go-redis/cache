@@ -11,7 +11,7 @@ require (
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.4
 	github.com/vmihailenco/bufpool v0.1.11
-	github.com/vmihailenco/go-tinylfu v0.1.0
+	github.com/vmihailenco/go-tinylfu v0.2.0
 	github.com/vmihailenco/msgpack/v5 v5.1.0
 	golang.org/x/exp v0.0.0-20201221025956-e89b829e73ea
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
