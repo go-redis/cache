@@ -16,6 +16,8 @@ import (
 	"github.com/go-redis/cache/v8"
 )
 
+var ctx = context.Background()
+
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "cache")
@@ -38,8 +40,6 @@ func perform(n int, cbs ...func(int)) {
 }
 
 var _ = Describe("Cache", func() {
-	ctx := context.TODO()
-
 	const key = "mykey"
 	var obj *Object
 
@@ -48,7 +48,7 @@ var _ = Describe("Cache", func() {
 
 	testCache := func() {
 		It("Gets and Sets nil", func() {
-			err := mycache.Set(&cache.Item{
+			err := mycache.Set(ctx, &cache.Item{
 				Key: key,
 				TTL: time.Hour,
 			})
@@ -61,8 +61,7 @@ var _ = Describe("Cache", func() {
 		})
 
 		It("Deletes key", func() {
-			err := mycache.Set(&cache.Item{
-				Ctx: ctx,
+			err := mycache.Set(ctx, &cache.Item{
 				Key: key,
 				TTL: time.Hour,
 			})
@@ -80,8 +79,7 @@ var _ = Describe("Cache", func() {
 		})
 
 		It("Gets and Sets data", func() {
-			err := mycache.Set(&cache.Item{
-				Ctx:   ctx,
+			err := mycache.Set(ctx, &cache.Item{
 				Key:   key,
 				Value: obj,
 				TTL:   time.Hour,
@@ -99,8 +97,7 @@ var _ = Describe("Cache", func() {
 		It("Sets string as is", func() {
 			value := "str_value"
 
-			err := mycache.Set(&cache.Item{
-				Ctx:   ctx,
+			err := mycache.Set(ctx, &cache.Item{
 				Key:   key,
 				Value: value,
 			})
@@ -115,8 +112,7 @@ var _ = Describe("Cache", func() {
 		It("Sets bytes as is", func() {
 			value := []byte("str_value")
 
-			err := mycache.Set(&cache.Item{
-				Ctx:   ctx,
+			err := mycache.Set(ctx, &cache.Item{
 				Key:   key,
 				Value: value,
 			})
@@ -135,8 +131,7 @@ var _ = Describe("Cache", func() {
 
 			value := "123"
 
-			err := mycache.Set(&cache.Item{
-				Ctx:   ctx,
+			err := mycache.Set(ctx, &cache.Item{
 				Key:   key,
 				Value: value,
 			})
@@ -149,8 +144,7 @@ var _ = Describe("Cache", func() {
 
 		Describe("Once func", func() {
 			It("calls Func when cache fails", func() {
-				err := mycache.Set(&cache.Item{
-					Ctx:   ctx,
+				err := mycache.Set(ctx, &cache.Item{
 					Key:   key,
 					Value: int64(0),
 				})
@@ -160,8 +154,7 @@ var _ = Describe("Cache", func() {
 				err = mycache.Get(ctx, key, &got)
 				Expect(err).To(MatchError("msgpack: invalid code=0 decoding bool"))
 
-				err = mycache.Once(&cache.Item{
-					Ctx:   ctx,
+				err = mycache.Once(ctx, &cache.Item{
 					Key:   key,
 					Value: &got,
 					Do: func(*cache.Item) (interface{}, error) {
@@ -180,8 +173,7 @@ var _ = Describe("Cache", func() {
 			It("does not cache when Func fails", func() {
 				perform(100, func(int) {
 					var got bool
-					err := mycache.Once(&cache.Item{
-						Ctx:   ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key:   key,
 						Value: &got,
 						Do: func(*cache.Item) (interface{}, error) {
@@ -196,8 +188,7 @@ var _ = Describe("Cache", func() {
 				err := mycache.Get(ctx, key, &got)
 				Expect(err).To(Equal(cache.ErrCacheMiss))
 
-				err = mycache.Once(&cache.Item{
-					Ctx:   ctx,
+				err = mycache.Once(ctx, &cache.Item{
 					Key:   key,
 					Value: &got,
 					Do: func(*cache.Item) (interface{}, error) {
@@ -212,8 +203,7 @@ var _ = Describe("Cache", func() {
 				var callCount int64
 				perform(100, func(int) {
 					got := new(Object)
-					err := mycache.Once(&cache.Item{
-						Ctx:   ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key:   key,
 						Value: got,
 						Do: func(*cache.Item) (interface{}, error) {
@@ -231,8 +221,7 @@ var _ = Describe("Cache", func() {
 				var callCount int64
 				perform(100, func(int) {
 					got := new(Object)
-					err := mycache.Once(&cache.Item{
-						Ctx:   ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key:   key,
 						Value: got,
 						Do: func(*cache.Item) (interface{}, error) {
@@ -250,8 +239,7 @@ var _ = Describe("Cache", func() {
 				var callCount int64
 				perform(100, func(int) {
 					var got bool
-					err := mycache.Once(&cache.Item{
-						Ctx:   ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key:   key,
 						Value: &got,
 						Do: func(*cache.Item) (interface{}, error) {
@@ -268,8 +256,7 @@ var _ = Describe("Cache", func() {
 			It("works without Value and nil result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					err := mycache.Once(&cache.Item{
-						Ctx: ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key: key,
 						Do: func(*cache.Item) (interface{}, error) {
 							atomic.AddInt64(&callCount, 1)
@@ -284,8 +271,7 @@ var _ = Describe("Cache", func() {
 			It("works without Value and error result", func() {
 				var callCount int64
 				perform(100, func(int) {
-					err := mycache.Once(&cache.Item{
-						Ctx: ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key: key,
 						Do: func(*cache.Item) (interface{}, error) {
 							time.Sleep(100 * time.Millisecond)
@@ -302,8 +288,7 @@ var _ = Describe("Cache", func() {
 				var callCount int64
 				do := func(sleep time.Duration) (int, error) {
 					var n int
-					err := mycache.Once(&cache.Item{
-						Ctx:   ctx,
+					err := mycache.Once(ctx, &cache.Item{
 						Key:   key,
 						Value: &n,
 						Do: func(*cache.Item) (interface{}, error) {
@@ -341,8 +326,7 @@ var _ = Describe("Cache", func() {
 				key := "skip-set"
 
 				var value string
-				err := mycache.Once(&cache.Item{
-					Ctx:   ctx,
+				err := mycache.Once(ctx, &cache.Item{
 					Key:   key,
 					Value: &value,
 					Do: func(item *cache.Item) (interface{}, error) {

@@ -35,8 +35,7 @@ func Example_basicUsage() {
 		Num: 42,
 	}
 
-	if err := mycache.Set(&cache.Item{
-		Ctx:   ctx,
+	if err := mycache.Set(ctx, &cache.Item{
 		Key:   key,
 		Value: obj,
 		TTL:   time.Hour,
@@ -66,7 +65,7 @@ func Example_advancedUsage() {
 	})
 
 	obj := new(Object)
-	err := mycache.Once(&cache.Item{
+	err := mycache.Once(ctx, &cache.Item{
 		Key:   "mykey",
 		Value: obj, // destination
 		Do: func(*cache.Item) (interface{}, error) {

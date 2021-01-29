@@ -60,8 +60,7 @@ func Example_basicUsage() {
         Num: 42,
     }
 
-    if err := mycache.Set(&cache.Item{
-        Ctx:   ctx,
+    if err := mycache.Set(ctx, &cache.Item{
         Key:   key,
         Value: obj,
         TTL:   time.Hour,

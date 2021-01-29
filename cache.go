@@ -40,8 +40,6 @@ type rediser interface {
 }
 
 type Item struct {
-	Ctx context.Context
-
 	Key   string
 	Value interface{}
 
@@ -60,13 +58,6 @@ type Item struct {
 
 	// SkipLocalCache skips local cache as if it is not set.
 	SkipLocalCache bool
-}
-
-func (item *Item) Context() context.Context {
-	if item.Ctx == nil {
-		return context.Background()
-	}
-	return item.Ctx
 }
 
 func (item *Item) value() (interface{}, error) {
@@ -122,12 +113,12 @@ func New(opt *Options) *Cache {
 }
 
 // Set caches the item.
-func (cd *Cache) Set(item *Item) error {
-	_, _, err := cd.set(item)
+func (cd *Cache) Set(ctx context.Context, item *Item) error {
+	_, _, err := cd.set(ctx, item)
 	return err
 }
 
-func (cd *Cache) set(item *Item) ([]byte, bool, error) {
+func (cd *Cache) set(ctx context.Context, item *Item) ([]byte, bool, error) {
 	value, err := item.value()
 	if err != nil {
 		return nil, false, err
@@ -155,12 +146,12 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 	}
 
 	if item.SetXX {
-		return b, true, cd.opt.Redis.SetXX(item.Context(), item.Key, b, ttl).Err()
+		return b, true, cd.opt.Redis.SetXX(ctx, item.Key, b, ttl).Err()
 	}
 	if item.SetNX {
-		return b, true, cd.opt.Redis.SetNX(item.Context(), item.Key, b, ttl).Err()
+		return b, true, cd.opt.Redis.SetNX(ctx, item.Key, b, ttl).Err()
 	}
-	return b, true, cd.opt.Redis.Set(item.Context(), item.Key, b, ttl).Err()
+	return b, true, cd.opt.Redis.Set(ctx, item.Key, b, ttl).Err()
 }
 
 // Exists reports whether value for the given key exists.
@@ -234,8 +225,8 @@ func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) 
 // making sure that only one execution is in-flight for a given item.Key
 // at a time. If a duplicate comes in, the duplicate caller waits for the
 // original to complete and receives the same results.
-func (cd *Cache) Once(item *Item) error {
-	b, cached, err := cd.getSetItemBytesOnce(item)
+func (cd *Cache) Once(ctx context.Context, item *Item) error {
+	b, cached, err := cd.getSetItemBytesOnce(ctx, item)
 	if err != nil {
 		return err
 	}
@@ -246,8 +237,8 @@ func (cd *Cache) Once(item *Item) error {
 
 	if err := cd.Unmarshal(b, item.Value); err != nil {
 		if cached {
-			_ = cd.Delete(item.Context(), item.Key)
-			return cd.Once(item)
+			_ = cd.Delete(ctx, item.Key)
+			return cd.Once(ctx, item)
 		}
 		return err
 	}
@@ -255,7 +246,9 @@ func (cd *Cache) Once(item *Item) error {
 	return nil
 }
 
-func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err error) {
+func (cd *Cache) getSetItemBytesOnce(
+	ctx context.Context, item *Item,
+) (b []byte, cached bool, err error) {
 	if cd.opt.LocalCache != nil {
 		b, ok := cd.opt.LocalCache.Get(item.Key)
 		if ok {
@@ -264,13 +257,13 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 	}
 
 	v, err, _ := cd.group.Do(item.Key, func() (interface{}, error) {
-		b, err := cd.getBytes(item.Context(), item.Key, item.SkipLocalCache)
+		b, err := cd.getBytes(ctx, item.Key, item.SkipLocalCache)
 		if err == nil {
 			cached = true
 			return b, nil
 		}
 
-		b, ok, err := cd.set(item)
+		b, ok, err := cd.set(ctx, item)
 		if ok {
 			return b, nil
 		}

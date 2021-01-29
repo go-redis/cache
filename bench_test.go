@@ -19,7 +19,7 @@ func BenchmarkOnce(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			var dst Object
-			err := mycache.Once(&cache.Item{
+			err := mycache.Once(ctx, &cache.Item{
 				Key:   "bench-once",
 				Value: &dst,
 				Do: func(*cache.Item) (interface{}, error) {
@@ -47,7 +47,7 @@ func BenchmarkSet(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			if err := mycache.Set(&cache.Item{
+			if err := mycache.Set(ctx, &cache.Item{
 				Key:   "bench-set",
 				Value: obj,
 			}); err != nil {
