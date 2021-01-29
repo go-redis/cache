@@ -80,14 +80,21 @@ func (item *Item) value() (interface{}, error) {
 }
 
 func (item *Item) ttl() time.Duration {
+	const defaultTTL = time.Hour
+
 	if item.TTL < 0 {
 		return 0
 	}
-	if item.TTL != 0 && item.TTL < time.Second {
-		log.Printf("too short TTL for key=%q: %s", item.Key, item.TTL)
-		return time.Hour
+
+	if item.TTL != 0 {
+		if item.TTL < time.Second {
+			log.Printf("too short TTL for key=%q: %s", item.Key, item.TTL)
+			return defaultTTL
+		}
+		return item.TTL
 	}
-	return item.TTL
+
+	return defaultTTL
 }
 
 //------------------------------------------------------------------------------
@@ -142,15 +149,18 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 		return b, true, nil
 	}
 
+	ttl := item.ttl()
+	if ttl == 0 {
+		return b, true, nil
+	}
+
 	if item.SetXX {
-		return b, true, cd.opt.Redis.SetXX(item.Context(), item.Key, b, item.ttl()).Err()
+		return b, true, cd.opt.Redis.SetXX(item.Context(), item.Key, b, ttl).Err()
 	}
-
 	if item.SetNX {
-		return b, true, cd.opt.Redis.SetNX(item.Context(), item.Key, b, item.ttl()).Err()
+		return b, true, cd.opt.Redis.SetNX(item.Context(), item.Key, b, ttl).Err()
 	}
-
-	return b, true, cd.opt.Redis.Set(item.Context(), item.Key, b, item.ttl()).Err()
+	return b, true, cd.opt.Redis.Set(item.Context(), item.Key, b, ttl).Err()
 }
 
 // Exists reports whether value for the given key exists.

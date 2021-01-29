@@ -336,6 +336,29 @@ var _ = Describe("Cache", func() {
 
 				Expect(callCount).To(Equal(int64(2)))
 			})
+
+			It("skips Set when TTL = -1", func() {
+				key := "skip-set"
+
+				var value string
+				err := mycache.Once(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &value,
+					Do: func(item *cache.Item) (interface{}, error) {
+						item.TTL = -1
+						return "hello", nil
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(value).To(Equal("hello"))
+
+				if rdb != nil {
+					exists, err := rdb.Exists(ctx, key).Result()
+					Expect(err).NotTo(HaveOccurred())
+					Expect(exists).To(Equal(int64(0)))
+				}
+			})
 		})
 	}
 
