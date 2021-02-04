@@ -214,7 +214,7 @@ func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) 
 		atomic.AddUint64(&cd.hits, 1)
 	}
 
-	if !skipLocalCache && cd.opt.LocalCache != nil {
+	if cd.opt.LocalCache != nil {
 		cd.opt.LocalCache.Set(key, b)
 	}
 	return b, nil
