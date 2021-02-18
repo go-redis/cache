@@ -291,6 +291,12 @@ func (cd *Cache) Delete(ctx context.Context, key string) error {
 	return err
 }
 
+func (cd *Cache) DeleteFromLocalCache(key string) {
+	if cd.opt.LocalCache != nil {
+		cd.opt.LocalCache.Del(key)
+	}
+}
+
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
 	switch value := value.(type) {
 	case nil:
