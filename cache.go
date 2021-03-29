@@ -98,11 +98,15 @@ func (item *Item) ttl() time.Duration {
 }
 
 //------------------------------------------------------------------------------
+type MarshalFunc func(interface{}) ([]byte, error)
+type UnmarshalFunc func([]byte, interface{}) error
 
 type Options struct {
 	Redis        rediser
 	LocalCache   LocalCache
 	StatsEnabled bool
+	Marshal      MarshalFunc
+	Unmarshal    UnmarshalFunc
 }
 
 type Cache struct {
@@ -111,14 +115,30 @@ type Cache struct {
 	group   singleflight.Group
 	bufpool bufpool.Pool
 
+	marshal   MarshalFunc
+	unmarshal UnmarshalFunc
+
 	hits   uint64
 	misses uint64
 }
 
 func New(opt *Options) *Cache {
-	return &Cache{
+	cacher := &Cache{
 		opt: opt,
 	}
+
+	if opt.Marshal == nil {
+		cacher.marshal = cacher._marshal
+	} else {
+		cacher.marshal = opt.Marshal
+	}
+
+	if opt.Unmarshal == nil {
+		cacher.unmarshal = cacher._unmarshal
+	} else {
+		cacher.unmarshal = opt.Unmarshal
+	}
+	return cacher
 }
 
 // Set caches the item.
@@ -190,7 +210,7 @@ func (cd *Cache) get(
 	if err != nil {
 		return err
 	}
-	return cd.Unmarshal(b, value)
+	return cd.unmarshal(b, value)
 }
 
 func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) ([]byte, error) {
@@ -244,7 +264,7 @@ func (cd *Cache) Once(item *Item) error {
 		return nil
 	}
 
-	if err := cd.Unmarshal(b, item.Value); err != nil {
+	if err := cd.unmarshal(b, item.Value); err != nil {
 		if cached {
 			_ = cd.Delete(item.Context(), item.Key)
 			return cd.Once(item)
@@ -305,6 +325,10 @@ func (cd *Cache) DeleteFromLocalCache(key string) {
 }
 
 func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
+	return cd.marshal(value)
+}
+
+func (cd *Cache) _marshal(value interface{}) ([]byte, error) {
 	switch value := value.(type) {
 	case nil:
 		return nil, nil
@@ -349,6 +373,10 @@ func compress(data []byte) []byte {
 }
 
 func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
+	return cd.unmarshal(b, value)
+}
+
+func (cd *Cache) _unmarshal(b []byte, value interface{}) error {
 	if len(b) == 0 {
 		return nil
 	}
