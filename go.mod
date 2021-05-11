@@ -3,11 +3,10 @@ module github.com/go-redis/cache/v8
 go 1.13
 
 require (
-	github.com/cespare/xxhash/v2 v2.1.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-redis/redis/v8 v8.4.4
 	github.com/golang/protobuf v1.4.3 // indirect
-	github.com/klauspost/compress v1.11.4
+	github.com/klauspost/compress v1.12.2
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.4
 	github.com/vmihailenco/bufpool v0.1.11
