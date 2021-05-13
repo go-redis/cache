@@ -360,6 +360,33 @@ var _ = Describe("Cache", func() {
 				}
 			})
 		})
+		It("works with cache hit or miss", func() {
+			var hits, misses uint64
+			var hitFunc = func(key string) {
+				atomic.AddUint64(&hits, 1)
+			}
+			var missFunc = func(key string) {
+				atomic.AddUint64(&misses, 1)
+			}
+			mycache = cache.New(&cache.Options{
+				StatsEnabled: true,
+				Redis:        rdb,
+				CacheHit:     hitFunc,
+				CacheMiss:    missFunc,
+			})
+			_ = mycache.Set(&cache.Item{
+				Ctx:   ctx,
+				Key:   "hit_key",
+				Value: obj,
+			})
+			got := &Object{}
+			perform(100, func(int) {
+				_ = mycache.Get(ctx, "hit_key", got)
+				_ = mycache.Get(ctx, "miss_key", got)
+			})
+			Expect(hits).To(Equal(uint64(100)))
+			Expect(misses).To(Equal(uint64(100)))
+		})
 	}
 
 	BeforeEach(func() {

@@ -101,12 +101,16 @@ func (item *Item) ttl() time.Duration {
 type MarshalFunc func(interface{}) ([]byte, error)
 type UnmarshalFunc func([]byte, interface{}) error
 
+type MetricFunc func(string)
+
 type Options struct {
 	Redis        rediser
 	LocalCache   LocalCache
 	StatsEnabled bool
 	Marshal      MarshalFunc
 	Unmarshal    UnmarshalFunc
+	CacheHit     MetricFunc
+	CacheMiss    MetricFunc
 }
 
 type Cache struct {
@@ -232,6 +236,9 @@ func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) 
 	if err != nil {
 		if cd.opt.StatsEnabled {
 			atomic.AddUint64(&cd.misses, 1)
+			if cd.opt.CacheMiss != nil {
+				cd.opt.CacheMiss(key)
+			}
 		}
 		if err == redis.Nil {
 			return nil, ErrCacheMiss
@@ -241,6 +248,9 @@ func (cd *Cache) getBytes(ctx context.Context, key string, skipLocalCache bool) 
 
 	if cd.opt.StatsEnabled {
 		atomic.AddUint64(&cd.hits, 1)
+		if cd.opt.CacheHit != nil {
+			cd.opt.CacheHit(key)
+		}
 	}
 
 	if !skipLocalCache && cd.opt.LocalCache != nil {
