@@ -1,9 +1,3 @@
-<p align="center">
-  <a href="https://uptrace.dev/?utm_source=gh-redis-cache&utm_campaign=gh-redis-cache-banner1">
-    <img src="https://raw.githubusercontent.com/uptrace/roadmap/master/banner1.png" alt="All-in-one tool to optimize performance and monitor errors & logs">
-  </a>
-</p>
-
 # Redis cache library for Golang
 
 [![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
