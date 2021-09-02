@@ -158,7 +158,7 @@ var _ = Describe("Cache", func() {
 
 				var got bool
 				err = mycache.Get(ctx, key, &got)
-				Expect(err).To(MatchError("msgpack: invalid code=0 decoding bool"))
+				Expect(err).To(MatchError("msgpack: invalid code=d3 decoding bool"))
 
 				err = mycache.Once(&cache.Item{
 					Ctx:   ctx,

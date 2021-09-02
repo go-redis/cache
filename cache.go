@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/klauspost/compress/s2"
-	"github.com/vmihailenco/bufpool"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/sync/singleflight"
 )
@@ -98,8 +97,10 @@ func (item *Item) ttl() time.Duration {
 }
 
 //------------------------------------------------------------------------------
-type MarshalFunc func(interface{}) ([]byte, error)
-type UnmarshalFunc func([]byte, interface{}) error
+type (
+	MarshalFunc   func(interface{}) ([]byte, error)
+	UnmarshalFunc func([]byte, interface{}) error
+)
 
 type Options struct {
 	Redis        rediser
@@ -112,8 +113,7 @@ type Options struct {
 type Cache struct {
 	opt *Options
 
-	group   singleflight.Group
-	bufpool bufpool.Pool
+	group singleflight.Group
 
 	marshal   MarshalFunc
 	unmarshal UnmarshalFunc
@@ -338,22 +338,12 @@ func (cd *Cache) _marshal(value interface{}) ([]byte, error) {
 		return []byte(value), nil
 	}
 
-	buf := cd.bufpool.Get()
-	defer cd.bufpool.Put(buf)
-
-	enc := msgpack.GetEncoder()
-	enc.Reset(buf)
-	enc.UseCompactInts(true)
-
-	err := enc.Encode(value)
-
-	msgpack.PutEncoder(enc)
-
+	b, err := msgpack.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
 
-	return compress(buf.Bytes()), nil
+	return compress(b), nil
 }
 
 func compress(data []byte) []byte {
@@ -400,15 +390,8 @@ func (cd *Cache) _unmarshal(b []byte, value interface{}) error {
 	case s2Compression:
 		b = b[:len(b)-1]
 
-		n, err := s2.DecodedLen(b)
-		if err != nil {
-			return err
-		}
-
-		buf := bufpool.Get(n)
-		defer bufpool.Put(buf)
-
-		b, err = s2.Decode(buf.Bytes(), b)
+		var err error
+		b, err = s2.Decode(nil, b)
 		if err != nil {
 			return err
 		}
