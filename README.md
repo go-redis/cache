@@ -3,10 +3,14 @@
 [![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
 [![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://pkg.go.dev/github.com/go-redis/cache/v8?tab=doc)
 
-go-redis/cache library implements a cache using Redis as a
-key/value storage. It uses [MessagePack](https://github.com/vmihailenco/msgpack) to marshal values.
+go-redis/cache library implements a cache using Redis as a key/value storage. It uses
+[MessagePack](https://github.com/vmihailenco/msgpack) to marshal values.
 
-Optinally you can use [TinyLFU](https://github.com/dgryski/go-tinylfu) or any other [cache algorithm](https://github.com/vmihailenco/go-cache-benchmark) as a local in-process cache.
+Optionally, you can use [TinyLFU](https://github.com/dgryski/go-tinylfu) or any other
+[cache algorithm](https://github.com/vmihailenco/go-cache-benchmark) as a local in-process cache.
+
+If you are interested in monitoring cache hit rate, see the guide for
+[Monitoring using OpenTelemetry Metrics](https://blog.uptrace.dev/posts/opentelemetry-metrics-cache-stats/).
 
 ## Installation
 
