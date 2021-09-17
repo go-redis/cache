@@ -3,9 +3,7 @@ package cache_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,7 +12,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/go-redis/cache/v8"
 )
@@ -401,86 +398,6 @@ var _ = Describe("Cache", func() {
 		testCache()
 	})
 })
-
-func TestCache_Get_CorruptionOnExpiry(t *testing.T) {
-	if testing.Short() {
-		t.Skip("this is a slow test")
-	}
-
-	strFor := func(i int) string {
-		return fmt.Sprintf("a string %d", i)
-	}
-	keyName := func(i int) string {
-		return fmt.Sprintf("key-%00000d", i)
-	}
-
-	// The local cache is configured with a cache of 1 minute
-	mycache := newCacheWithLocal(newRing())
-	size := 50000
-	// Put a bunch of stuff in the cache with a TTL of 1 minute
-	for i := 0; i < size; i++ {
-		key := keyName(i)
-
-		err := mycache.Set(&cache.Item{
-			Ctx: context.Background(),
-			Key: key,
-			Value: &Object{
-				Str: strFor(i),
-				Num: i,
-			},
-			TTL: time.Minute,
-		})
-		if err != nil {
-			t.Errorf("failed to set cache key: %s", key)
-		}
-	}
-
-	// Read stuff for a bit longer than the TTL - that's when the corruption occurs
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute+10*time.Second)
-	defer cancel()
-
-	g, ctx := errgroup.WithContext(ctx)
-	// Start lots of readers
-	for i := 0; i < 500; i++ {
-		g.Go(func() error {
-			done := ctx.Done()
-		loop:
-			for {
-				select {
-				case <-done:
-					return nil
-				default:
-					i := rand.Intn(size / 2) // only access half of the keys
-					key := keyName(i)
-
-					var obj Object
-					err := mycache.Get(ctx, key, &obj)
-					switch {
-					case errors.Is(err, cache.ErrCacheMiss):
-						continue loop
-					case err != nil:
-						return err
-					default:
-						if obj.Num != i {
-							return fmt.Errorf("expected obj.Num=%d to be=%d key=%q", obj.Num, i, key)
-						}
-						if obj.Str != strFor(i) {
-							return fmt.Errorf("obj.Str had wrong value %q", obj.Str)
-						}
-					}
-				}
-			}
-		})
-	}
-
-	err := g.Wait()
-	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		// this is expected
-	case err != nil:
-		t.Errorf("failed with error: %s", err)
-	}
-}
 
 func newRing() *redis.Ring {
 	ctx := context.TODO()
