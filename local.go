@@ -1,11 +1,11 @@
 package cache
 
 import (
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/vmihailenco/go-tinylfu"
-	"golang.org/x/exp/rand"
 )
 
 type LocalCache interface {
@@ -33,7 +33,7 @@ func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
 	}
 
 	return &TinyLFU{
-		rand:   rand.New(rand.NewSource(uint64(time.Now().UnixNano()))),
+		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
 		lfu:    tinylfu.New(size, 100000),
 		ttl:    ttl,
 		offset: offset,
