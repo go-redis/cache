@@ -128,6 +128,51 @@ var _ = Describe("Cache", func() {
 			Expect(dst).To(Equal(value))
 		})
 
+		Describe("Sets", func() {
+			It("does not cache when Cacheable returns a false from the Value", func() {
+				key := "skip-key"
+				value := "hello"
+				err := mycache.Set(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &value,
+					Cacheable: func(v interface{}) bool {
+						val, ok := v.(*string)
+						if !ok {
+							return false
+						}
+						return *val != value
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(mycache.Exists(ctx, key)).To(BeFalse())
+			})
+
+			It("does not cache when Cacheable returns a false from Do func", func() {
+				key := "skip-key"
+				var value string
+				err := mycache.Set(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &value,
+					Do: func(item *cache.Item) (interface{}, error) {
+						return "hello", nil
+					},
+					Cacheable: func(v interface{}) bool {
+						val, ok := v.(*string)
+						if !ok {
+							return false
+						}
+						return *val != "hello"
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(mycache.Exists(ctx, key)).To(BeFalse())
+			})
+		})
+
 		It("can be used with Incr", func() {
 			if rdb == nil {
 				return
@@ -358,6 +403,29 @@ var _ = Describe("Cache", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(exists).To(Equal(int64(0)))
 				}
+			})
+
+			It("skips Set when Cacheable returns a false", func() {
+				key := "skip-key"
+				var value string
+				err := mycache.Once(&cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &value,
+					Do: func(item *cache.Item) (interface{}, error) {
+						return "hello", nil
+					},
+					Cacheable: func(v interface{}) bool {
+						val, ok := v.(*string)
+						if !ok {
+							return false
+						}
+						return *val != "hello"
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(mycache.Exists(ctx, key)).To(BeFalse())
 			})
 		})
 	}
