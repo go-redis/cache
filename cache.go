@@ -59,6 +59,9 @@ type Item struct {
 
 	// SkipLocalCache skips local cache as if it is not set.
 	SkipLocalCache bool
+
+	// CacheHit is true if Value is found in the cache.
+	CacheHit bool
 }
 
 func (item *Item) Context() context.Context {
@@ -259,6 +262,7 @@ func (cd *Cache) Once(item *Item) error {
 	if err != nil {
 		return err
 	}
+	item.CacheHit = cached
 
 	if item.Value == nil || len(b) == 0 {
 		return nil
