@@ -27,6 +27,7 @@ const (
 var (
 	ErrCacheMiss          = errors.New("cache: key is missing")
 	errRedisLocalCacheNil = errors.New("cache: both Redis and LocalCache are nil")
+	ErrInvalidTTL         = errors.New("cache: invalid ttl value")
 )
 
 type rediser interface {
@@ -171,7 +172,7 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 
 	ttl := item.ttl()
 	if ttl == 0 {
-		return b, true, nil
+		return b, false, ErrInvalidTTL
 	}
 
 	if item.SetXX {

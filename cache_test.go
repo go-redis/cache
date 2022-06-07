@@ -337,7 +337,7 @@ var _ = Describe("Cache", func() {
 				Expect(callCount).To(Equal(int64(2)))
 			})
 
-			It("skips Set when TTL = -1", func() {
+			It("skips Set when TTL = -1 and return error", func() {
 				key := "skip-set"
 
 				var value string
@@ -347,10 +347,11 @@ var _ = Describe("Cache", func() {
 					Value: &value,
 					Do: func(item *cache.Item) (interface{}, error) {
 						item.TTL = -1
-						return "hello", nil
+						return "hello", cache.ErrInvalidTTL
 					},
 				})
-				Expect(err).NotTo(HaveOccurred())
+
+				Expect(err).To(Equal(cache.ErrCacheMiss))
 				Expect(value).To(Equal("hello"))
 
 				if rdb != nil {
