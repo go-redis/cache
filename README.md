@@ -1,7 +1,7 @@
 # Redis cache library for Golang
 
 [![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
-[![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://pkg.go.dev/github.com/go-redis/cache/v8?tab=doc)
+[![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://pkg.go.dev/github.com/go-redis/cache/v9?tab=doc)
 
 > go-redis/cache is brought to you by :star:
 > [**uptrace/uptrace**](https://github.com/uptrace/uptrace). Uptrace is an open source and blazingly
@@ -27,10 +27,10 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install go-redis/cache/v8 (note _v8_ in the import; omitting it is a popular mistake):
+And then install go-redis/cache/v9 (note _v9_ in the import; omitting it is a popular mistake):
 
 ```shell
-go get github.com/go-redis/cache/v8
+go get github.com/go-redis/cache/v9
 ```
 
 ## Quickstart
@@ -43,8 +43,8 @@ import (
     "fmt"
     "time"
 
-    "github.com/go-redis/redis/v8"
-    "github.com/go-redis/cache/v8"
+    "github.com/go-redis/redis/v9"
+    "github.com/go-redis/cache/v9"
 )
 
 type Object struct {

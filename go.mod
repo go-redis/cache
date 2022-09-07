@@ -1,11 +1,9 @@
-module github.com/go-redis/cache/v8
+module github.com/go-redis/cache/v9
 
 go 1.13
 
 require (
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/go-redis/redis/v8 v8.11.3
-	github.com/go-redis/redis/v9 v9.0.0-beta.2 // indirect
+	github.com/go-redis/redis/v9 v9.0.0-beta.2
 	github.com/klauspost/compress v1.13.6
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/onsi/ginkgo v1.16.5
