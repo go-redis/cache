@@ -3,6 +3,11 @@
 [![Build Status](https://travis-ci.org/go-redis/cache.svg)](https://travis-ci.org/go-redis/cache)
 [![GoDoc](https://godoc.org/github.com/go-redis/cache?status.svg)](https://pkg.go.dev/github.com/go-redis/cache/v8?tab=doc)
 
+> go-redis/cache is brought to you by :star:
+> [**uptrace/uptrace**](https://github.com/uptrace/uptrace). Uptrace is an open source and blazingly
+> fast [distributed tracing tool](https://get.uptrace.dev/) powered by OpenTelemetry and ClickHouse.
+> Give it a star as well!
+
 go-redis/cache library implements a cache using Redis as a key/value storage. It uses
 [MessagePack](https://github.com/vmihailenco/msgpack) to marshal values.
 
