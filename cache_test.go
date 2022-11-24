@@ -227,6 +227,30 @@ var _ = Describe("Cache", func() {
 				Expect(callCount).To(Equal(int64(1)))
 			})
 
+			It("works with CacheHit", func() {
+				key := "cache-hit-test"
+				do := func(item *cache.Item) (interface{}, error) {
+					return "hello", nil
+				}
+				var value string
+				item := cache.Item{
+					Ctx:   ctx,
+					Key:   key,
+					Value: &value,
+					Do:    do,
+				}
+
+				err := mycache.Once(&item)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(item.CacheHit).To(Equal(false))
+
+				err = mycache.Once(&item)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(item.CacheHit).To(Equal(true))
+			})
+
 			It("works with ptr and non-ptr", func() {
 				var callCount int64
 				perform(100, func(int) {
