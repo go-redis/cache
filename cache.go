@@ -51,6 +51,9 @@ type Item struct {
 	// Do returns value to be cached.
 	Do func(*Item) (interface{}, error)
 
+	// Cacheable determines be cached or not depends on the Value(or the value returned from Do function).
+	Cacheable func(interface{}) bool
+
 	// SetXX only sets the key if it already exists.
 	SetXX bool
 
@@ -158,14 +161,19 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 		return nil, false, err
 	}
 
+	if cd.opt.Redis == nil && cd.opt.LocalCache == nil {
+		return b, true, errRedisLocalCacheNil
+	}
+
+	if item.Cacheable != nil && !item.Cacheable(value) {
+		return b, true, nil
+	}
+
 	if cd.opt.LocalCache != nil && !item.SkipLocalCache {
 		cd.opt.LocalCache.Set(item.Key, b)
 	}
 
 	if cd.opt.Redis == nil {
-		if cd.opt.LocalCache == nil {
-			return b, true, errRedisLocalCacheNil
-		}
 		return b, true, nil
 	}
 
