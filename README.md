@@ -43,7 +43,7 @@ import (
     "fmt"
     "time"
 
-    "github.com/go-redis/redis/v9"
+    "github.com/redis/go-redis/v9"
     "github.com/go-redis/cache/v9"
 )
 

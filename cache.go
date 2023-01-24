@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-redis/redis/v9"
 	"github.com/klauspost/compress/s2"
+	"github.com/redis/go-redis/v9"
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/sync/singleflight"
 )
