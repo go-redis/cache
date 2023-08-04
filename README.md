@@ -11,7 +11,7 @@
 go-redis/cache library implements a cache using Redis as a key/value storage. It uses
 [MessagePack](https://github.com/vmihailenco/msgpack) to marshal values.
 
-Optionally, you can use [TinyLFU](https://github.com/dgryski/go-tinylfu) or any other
+Optionally, you can use [TinyLFU](https://github.com/vmihailenco/go-tinylfu) or any other
 [cache algorithm](https://github.com/vmihailenco/go-cache-benchmark) as a local in-process cache.
 
 If you are interested in monitoring cache hit rate, see the guide for
