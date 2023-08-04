@@ -3,7 +3,7 @@ module github.com/go-redis/cache/v9
 go 1.13
 
 require (
-	github.com/klauspost/compress v1.13.6
+	github.com/klauspost/compress v1.16.7
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.25.0
