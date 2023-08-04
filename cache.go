@@ -96,7 +96,7 @@ func (item *Item) ttl() time.Duration {
 	return defaultTTL
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 type (
 	MarshalFunc   func(interface{}) ([]byte, error)
 	UnmarshalFunc func([]byte, interface{}) error
