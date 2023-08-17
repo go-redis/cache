@@ -12,6 +12,7 @@ type LocalCache interface {
 	Set(key string, data []byte)
 	Get(key string) ([]byte, bool)
 	Del(key string)
+	Clear()
 }
 
 type TinyLFU struct {
@@ -20,9 +21,12 @@ type TinyLFU struct {
 	lfu    *tinylfu.T
 	ttl    time.Duration
 	offset time.Duration
+	size   int
 }
 
 var _ LocalCache = (*TinyLFU)(nil)
+
+const lruSamples = 100000
 
 func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
 	const maxOffset = 10 * time.Second
@@ -34,9 +38,10 @@ func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
 
 	return &TinyLFU{
 		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
-		lfu:    tinylfu.New(size, 100000),
+		lfu:    tinylfu.New(size, lruSamples),
 		ttl:    ttl,
 		offset: offset,
+		size:   size,
 	}
 }
 
@@ -78,4 +83,11 @@ func (c *TinyLFU) Del(key string) {
 	defer c.mu.Unlock()
 
 	c.lfu.Del(key)
+}
+
+func (c *TinyLFU) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.lfu = tinylfu.New(c.size, lruSamples)
 }

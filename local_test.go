@@ -54,3 +54,43 @@ loop:
 		}
 	}
 }
+
+func TestTinyLFU_Clear(t *testing.T) {
+	rounds := 100
+	makeKey := func(round int) string {
+		return fmt.Sprintf("key-%d", round)
+	}
+	makeVal := func(round int) []byte {
+		return []byte(fmt.Sprintf("%d", round))
+	}
+
+	myCache := cache.NewTinyLFU(rounds+1, time.Hour)
+	for i := 0; i < rounds; i++ {
+		myCache.Set(makeKey(i), makeVal(i))
+	}
+
+	// ensure entries are present
+	for i := 0; i < rounds; i++ {
+		key := makeKey(i)
+		expected := string(makeVal(i))
+		b, ok := myCache.Get(key)
+		if !ok {
+			t.Fatalf("expected key=%q to be present (expected=%q), but was missing", key, expected)
+		}
+		got := string(b)
+		if expected != got {
+			t.Fatalf("expected=%q, got=%q, key=%q", expected, got, key)
+		}
+	}
+
+	myCache.Clear()
+
+	for i := 0; i < rounds; i++ {
+		key := makeKey(i)
+		b, ok := myCache.Get(key)
+		if ok {
+			got := string(b)
+			t.Fatalf("expected key=%q to be missing, got=%s", key, got)
+		}
+	}
+}
