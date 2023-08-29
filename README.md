@@ -52,7 +52,7 @@ type Object struct {
     Num int
 }
 
-func Example_basicUsage() {
+func Example_basicUsage_tinyLFU() {
     ring := redis.NewRing(&redis.RingOptions{
         Addrs: map[string]string{
             "server1": ":6379",
@@ -118,5 +118,42 @@ func Example_advancedUsage() {
     }
     fmt.Println(obj)
     // Output: &{mystring 42}
+}
+
+func Example_basicUsage_freecache() {
+    ring := redis.NewRing(&redis.RingOptions{
+        Addrs: map[string]string{
+            "server1": ":6379",
+            "server2": ":6380",
+        },
+    })
+
+    mycache := cache.New(&cache.Options{
+        Redis:      ring,
+        LocalCache: cache.NewFreecache(2097152, time.Minute),
+    })
+
+    ctx := context.TODO()
+    key := "mykey"
+    obj := &Object{
+        Str: "mystring",
+        Num: 42,
+    }
+
+    if err := mycache.Set(&cache.Item{
+        Ctx:   ctx,
+        Key:   key,
+        Value: obj,
+        TTL:   time.Hour,
+    }); err != nil {
+        panic(err)
+    }
+
+    var wanted Object
+    if err := mycache.Get(ctx, key, &wanted); err == nil {
+        fmt.Println(wanted)
+    }
+
+    // Output: {mystring 42}
 }
 ```

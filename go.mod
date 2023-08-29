@@ -3,6 +3,7 @@ module github.com/go-redis/cache/v9
 go 1.13
 
 require (
+	github.com/coocood/freecache v1.2.3 // indirect
 	github.com/klauspost/compress v1.13.6
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/onsi/ginkgo v1.16.5
