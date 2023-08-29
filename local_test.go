@@ -18,7 +18,7 @@ func TestTinyLFU_Get_CorruptionOnExpiry(t *testing.T) {
 		return fmt.Sprintf("key-%00000d", i)
 	}
 
-	mycache := cache.NewTinyLFU(1000, 1*time.Second)
+	mycache := cache.NewTinyLFU(1000, 1*time.Second, false)
 	size := 50000
 	// Put a bunch of stuff in the cache with a TTL of 1 second
 	for i := 0; i < size; i++ {

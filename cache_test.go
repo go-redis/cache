@@ -391,7 +391,7 @@ var _ = Describe("Cache", func() {
 		BeforeEach(func() {
 			rdb = nil
 			mycache = cache.New(&cache.Options{
-				LocalCache: cache.NewTinyLFU(1000, time.Minute),
+				LocalCache: cache.NewTinyLFU(1000, time.Minute, false),
 			})
 		})
 
@@ -421,6 +421,6 @@ func newCache(rdb *redis.Ring) *cache.Cache {
 func newCacheWithLocal(rdb *redis.Ring) *cache.Cache {
 	return cache.New(&cache.Options{
 		Redis:      rdb,
-		LocalCache: cache.NewTinyLFU(1000, time.Minute),
+		LocalCache: cache.NewTinyLFU(1000, time.Minute, false),
 	})
 }

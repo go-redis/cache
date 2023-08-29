@@ -25,7 +25,7 @@ func Example_basicUsage() {
 
 	mycache := cache.New(&cache.Options{
 		Redis:      ring,
-		LocalCache: cache.NewTinyLFU(1000, time.Minute),
+		LocalCache: cache.NewTinyLFU(1000, time.Minute, false),
 	})
 
 	ctx := context.TODO()
@@ -62,7 +62,7 @@ func Example_advancedUsage() {
 
 	mycache := cache.New(&cache.Options{
 		Redis:      ring,
-		LocalCache: cache.NewTinyLFU(1000, time.Minute),
+		LocalCache: cache.NewTinyLFU(1000, time.Minute, false),
 	})
 
 	obj := new(Object)
