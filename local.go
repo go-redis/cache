@@ -2,10 +2,14 @@ package cache
 
 import (
 	"math/rand"
-	"sync"
 	"time"
 
 	"github.com/vmihailenco/go-tinylfu"
+)
+
+const (
+	MaxOffset         = int64(10 * time.Second)
+	DefaultLFUSamples = 100000
 )
 
 type LocalCache interface {
@@ -14,46 +18,75 @@ type LocalCache interface {
 	Del(key string)
 }
 
-type TinyLFU struct {
-	mu     sync.Mutex
+type tinyLFU struct {
 	rand   *rand.Rand
-	lfu    *tinylfu.T
+	lfu    *tinylfu.SyncT
 	ttl    time.Duration
-	offset time.Duration
+	offset int64
 }
 
-var _ LocalCache = (*TinyLFU)(nil)
+var _ LocalCache = (*tinyLFU)(nil)
 
-func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
-	const maxOffset = 10 * time.Second
-
-	offset := ttl / 10
-	if offset > maxOffset {
-		offset = maxOffset
-	}
-
-	return &TinyLFU{
-		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
-		lfu:    tinylfu.New(size, 100000),
-		ttl:    ttl,
-		offset: offset,
-	}
+type conf struct {
+	src     rand.Source
+	samples int
+	offset  int64
 }
 
-func (c *TinyLFU) UseRandomizedTTL(offset time.Duration) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *conf) SetDefaults(offset int64) {
+	c.src = rand.NewSource(time.Now().UnixNano())
+	c.samples = DefaultLFUSamples
+
+	if offset > MaxOffset {
+		c.offset = MaxOffset
+	}
 
 	c.offset = offset
 }
 
-func (c *TinyLFU) Set(key string, b []byte) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+type Option func(*conf)
 
+func UseRandomizedTTL(offset time.Duration) Option {
+	return func(c *conf) {
+		c.offset = int64(offset) // must check max offset?
+	}
+}
+
+func UseSamples(samples int) Option {
+	return func(c *conf) {
+		c.samples = samples
+	}
+}
+
+// UseRandomSource functional option.
+func UseRandomSource(src rand.Source) Option {
+	return func(c *conf) {
+		c.src = src
+	}
+}
+
+// NewTinyLFU ctor.
+func NewTinyLFU(size int, ttl time.Duration, opts ...Option) LocalCache {
+	var c conf
+
+	c.SetDefaults(int64(ttl) / 10)
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	return &tinyLFU{
+		rand:   rand.New(c.src),
+		lfu:    tinylfu.NewSync(size, c.samples),
+		ttl:    ttl,
+		offset: c.offset,
+	}
+}
+
+func (c *tinyLFU) Set(key string, b []byte) {
 	ttl := c.ttl
 	if c.offset > 0 {
-		ttl += time.Duration(c.rand.Int63n(int64(c.offset)))
+		ttl += time.Duration(c.rand.Int63n(c.offset))
 	}
 
 	c.lfu.Set(&tinylfu.Item{
@@ -63,22 +96,16 @@ func (c *TinyLFU) Set(key string, b []byte) {
 	})
 }
 
-func (c *TinyLFU) Get(key string) ([]byte, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func (c *tinyLFU) Get(key string) ([]byte, bool) {
 	val, ok := c.lfu.Get(key)
 	if !ok {
 		return nil, false
 	}
 
-	b := val.([]byte)
+	b, _ := val.([]byte)
 	return b, true
 }
 
-func (c *TinyLFU) Del(key string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func (c *tinyLFU) Del(key string) {
 	c.lfu.Del(key)
 }
