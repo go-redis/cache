@@ -8,10 +8,14 @@ import (
 )
 
 const (
-	MaxOffset         = int64(10 * time.Second)
+	// MaxOffset specifies the max offset.
+	MaxOffset = int64(10 * time.Second)
+
+	// DefaultLFUSamples specifies the default lfu samples
 	DefaultLFUSamples = 100000
 )
 
+// LocalCache interface.
 type LocalCache interface {
 	Set(key string, data []byte)
 	Get(key string) ([]byte, bool)
@@ -36,7 +40,10 @@ type conf struct {
 func (c *conf) SetDefaults(offset int64) {
 	c.src = rand.NewSource(time.Now().UnixNano())
 	c.samples = DefaultLFUSamples
+	c.setOffset(offset)
+}
 
+func (c *conf) setOffset(offset int64) {
 	if offset > MaxOffset {
 		c.offset = MaxOffset
 	}
@@ -44,21 +51,24 @@ func (c *conf) SetDefaults(offset int64) {
 	c.offset = offset
 }
 
+// Option functional option type.
 type Option func(*conf)
 
+// UseRandomizedTTL change the offset (by default it is ttl / 10)
 func UseRandomizedTTL(offset time.Duration) Option {
 	return func(c *conf) {
-		c.offset = int64(offset) // must check max offset?
+		c.setOffset(int64(offset))
 	}
 }
 
+// UseSamples change the lfu samples.
 func UseSamples(samples int) Option {
 	return func(c *conf) {
 		c.samples = samples
 	}
 }
 
-// UseRandomSource functional option.
+// UseRandomSource change the random source.
 func UseRandomSource(src rand.Source) Option {
 	return func(c *conf) {
 		c.src = src
