@@ -41,6 +41,9 @@ func NewTinyLFU(size int, ttl time.Duration) *TinyLFU {
 }
 
 func (c *TinyLFU) UseRandomizedTTL(offset time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.offset = offset
 }
 
