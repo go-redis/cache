@@ -164,7 +164,7 @@ var _ = Describe("Cache", func() {
 					Ctx:   ctx,
 					Key:   key,
 					Value: &got,
-					Do: func(*cache.Item) (interface{}, error) {
+					Do: func(*cache.Item) (any, error) {
 						return true, nil
 					},
 				})
@@ -184,7 +184,7 @@ var _ = Describe("Cache", func() {
 						Ctx:   ctx,
 						Key:   key,
 						Value: &got,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							return nil, io.EOF
 						},
 					})
@@ -200,7 +200,7 @@ var _ = Describe("Cache", func() {
 					Ctx:   ctx,
 					Key:   key,
 					Value: &got,
-					Do: func(*cache.Item) (interface{}, error) {
+					Do: func(*cache.Item) (any, error) {
 						return true, nil
 					},
 				})
@@ -216,7 +216,7 @@ var _ = Describe("Cache", func() {
 						Ctx:   ctx,
 						Key:   key,
 						Value: got,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							atomic.AddInt64(&callCount, 1)
 							return obj, nil
 						},
@@ -235,7 +235,7 @@ var _ = Describe("Cache", func() {
 						Ctx:   ctx,
 						Key:   key,
 						Value: got,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							atomic.AddInt64(&callCount, 1)
 							return *obj, nil
 						},
@@ -254,7 +254,7 @@ var _ = Describe("Cache", func() {
 						Ctx:   ctx,
 						Key:   key,
 						Value: &got,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							atomic.AddInt64(&callCount, 1)
 							return true, nil
 						},
@@ -271,7 +271,7 @@ var _ = Describe("Cache", func() {
 					err := mycache.Once(&cache.Item{
 						Ctx: ctx,
 						Key: key,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							atomic.AddInt64(&callCount, 1)
 							return nil, nil
 						},
@@ -287,7 +287,7 @@ var _ = Describe("Cache", func() {
 					err := mycache.Once(&cache.Item{
 						Ctx: ctx,
 						Key: key,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							time.Sleep(100 * time.Millisecond)
 							atomic.AddInt64(&callCount, 1)
 							return nil, errors.New("error stub")
@@ -306,7 +306,7 @@ var _ = Describe("Cache", func() {
 						Ctx:   ctx,
 						Key:   key,
 						Value: &n,
-						Do: func(*cache.Item) (interface{}, error) {
+						Do: func(*cache.Item) (any, error) {
 							time.Sleep(sleep)
 
 							n := atomic.AddInt64(&callCount, 1)
@@ -337,16 +337,16 @@ var _ = Describe("Cache", func() {
 				Expect(callCount).To(Equal(int64(2)))
 			})
 
-			It("skips Set when TTL = -1", func() {
-				key := "skip-set"
+			It("normalizes TTL to KeepTTL when < -1", func() {
+				key := "normalize-ttl"
 
 				var value string
 				err := mycache.Once(&cache.Item{
 					Ctx:   ctx,
 					Key:   key,
 					Value: &value,
-					Do: func(item *cache.Item) (interface{}, error) {
-						item.TTL = -1
+					Do: func(item *cache.Item) (any, error) {
+						item.TTL = -2
 						return "hello", nil
 					},
 				})
@@ -356,7 +356,8 @@ var _ = Describe("Cache", func() {
 				if rdb != nil {
 					exists, err := rdb.Exists(ctx, key).Result()
 					Expect(err).NotTo(HaveOccurred())
-					Expect(exists).To(Equal(int64(0)))
+					Expect(exists).To(Equal(int64(1)))
+					Expect(rdb.TTL(ctx, key).Val()).To(Equal(time.Duration(redis.KeepTTL)))
 				}
 			})
 		})
