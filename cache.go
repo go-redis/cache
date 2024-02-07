@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -30,36 +29,46 @@ var (
 )
 
 type rediser interface {
-	Set(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.StatusCmd
-	SetXX(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.BoolCmd
-	SetNX(ctx context.Context, key string, value interface{}, ttl time.Duration) *redis.BoolCmd
-
+	SetArgs(ctx context.Context, key string, value any, a redis.SetArgs) *redis.StatusCmd
 	Get(ctx context.Context, key string) *redis.StringCmd
 	Del(ctx context.Context, keys ...string) *redis.IntCmd
 }
 
-type Item struct {
-	Ctx context.Context
+type (
+	Item struct {
+		Ctx context.Context
 
-	Key   string
-	Value interface{}
+		Key   string
+		Value any
 
-	// TTL is the cache expiration time.
-	// Default TTL is 1 hour.
-	TTL time.Duration
+		// TTL is the cache expiration time.
+		// TTL of zero means no expiration time.
+		TTL time.Duration
 
-	// Do returns value to be cached.
-	Do func(*Item) (interface{}, error)
+		// ExpireAt is the cache expiration time.
+		ExpireAt time.Time
 
-	// SetXX only sets the key if it already exists.
-	SetXX bool
+		// Do returns value to be cached.
+		Do func(*Item) (any, error)
 
-	// SetNX only sets the key if it does not already exist.
-	SetNX bool
+		// Mode toggles the "XX"/"NX" flags when calling SET.
+		// - ModeXX: Only set the key if it already exists.
+		// - ModeNX: Only set the key if it does not already exist.
+		Mode Mode
 
-	// SkipLocalCache skips local cache as if it is not set.
-	SkipLocalCache bool
-}
+		// SkipLocalCache skips local cache as if it is not set.
+		SkipLocalCache bool
+
+		// Retail the time to live associated with the key.
+		KeepTTL bool
+	}
+	Mode string
+)
+
+const (
+	ModeXX Mode = "xx"
+	ModeNX Mode = "nx"
+)
 
 func (item *Item) Context() context.Context {
 	if item.Ctx == nil {
@@ -68,7 +77,7 @@ func (item *Item) Context() context.Context {
 	return item.Ctx
 }
 
-func (item *Item) value() (interface{}, error) {
+func (item *Item) value() (any, error) {
 	if item.Do != nil {
 		return item.Do(item)
 	}
@@ -78,28 +87,10 @@ func (item *Item) value() (interface{}, error) {
 	return nil, nil
 }
 
-func (item *Item) ttl() time.Duration {
-	const defaultTTL = time.Hour
-
-	if item.TTL < 0 {
-		return 0
-	}
-
-	if item.TTL != 0 {
-		if item.TTL < time.Second {
-			log.Printf("too short TTL for key=%q: %s", item.Key, item.TTL)
-			return defaultTTL
-		}
-		return item.TTL
-	}
-
-	return defaultTTL
-}
-
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 type (
-	MarshalFunc   func(interface{}) ([]byte, error)
-	UnmarshalFunc func([]byte, interface{}) error
+	MarshalFunc   func(any) ([]byte, error)
+	UnmarshalFunc func([]byte, any) error
 )
 
 type Options struct {
@@ -169,18 +160,14 @@ func (cd *Cache) set(item *Item) ([]byte, bool, error) {
 		return b, true, nil
 	}
 
-	ttl := item.ttl()
-	if ttl == 0 {
-		return b, true, nil
+	setArgs := redis.SetArgs{
+		Mode:     string(item.Mode),
+		TTL:      item.TTL,
+		ExpireAt: item.ExpireAt,
+		KeepTTL:  item.KeepTTL,
 	}
 
-	if item.SetXX {
-		return b, true, cd.opt.Redis.SetXX(item.Context(), item.Key, b, ttl).Err()
-	}
-	if item.SetNX {
-		return b, true, cd.opt.Redis.SetNX(item.Context(), item.Key, b, ttl).Err()
-	}
-	return b, true, cd.opt.Redis.Set(item.Context(), item.Key, b, ttl).Err()
+	return b, true, cd.opt.Redis.SetArgs(item.Context(), item.Key, b, setArgs).Err()
 }
 
 // Exists reports whether value for the given key exists.
@@ -190,13 +177,13 @@ func (cd *Cache) Exists(ctx context.Context, key string) bool {
 }
 
 // Get gets the value for the given key.
-func (cd *Cache) Get(ctx context.Context, key string, value interface{}) error {
+func (cd *Cache) Get(ctx context.Context, key string, value any) error {
 	return cd.get(ctx, key, value, false)
 }
 
 // Get gets the value for the given key skipping local cache.
 func (cd *Cache) GetSkippingLocalCache(
-	ctx context.Context, key string, value interface{},
+	ctx context.Context, key string, value any,
 ) error {
 	return cd.get(ctx, key, value, true)
 }
@@ -204,7 +191,7 @@ func (cd *Cache) GetSkippingLocalCache(
 func (cd *Cache) get(
 	ctx context.Context,
 	key string,
-	value interface{},
+	value any,
 	skipLocalCache bool,
 ) error {
 	b, err := cd.getBytes(ctx, key, skipLocalCache)
@@ -284,7 +271,7 @@ func (cd *Cache) getSetItemBytesOnce(item *Item) (b []byte, cached bool, err err
 		}
 	}
 
-	v, err, _ := cd.group.Do(item.Key, func() (interface{}, error) {
+	v, err, _ := cd.group.Do(item.Key, func() (any, error) {
 		b, err := cd.getBytes(item.Context(), item.Key, item.SkipLocalCache)
 		if err == nil {
 			cached = true
@@ -325,11 +312,11 @@ func (cd *Cache) DeleteFromLocalCache(key string) {
 	}
 }
 
-func (cd *Cache) Marshal(value interface{}) ([]byte, error) {
+func (cd *Cache) Marshal(value any) ([]byte, error) {
 	return cd.marshal(value)
 }
 
-func (cd *Cache) _marshal(value interface{}) ([]byte, error) {
+func (cd *Cache) _marshal(value any) ([]byte, error) {
 	switch value := value.(type) {
 	case nil:
 		return nil, nil
@@ -363,11 +350,11 @@ func compress(data []byte) []byte {
 	return b
 }
 
-func (cd *Cache) Unmarshal(b []byte, value interface{}) error {
+func (cd *Cache) Unmarshal(b []byte, value any) error {
 	return cd.unmarshal(b, value)
 }
 
-func (cd *Cache) _unmarshal(b []byte, value interface{}) error {
+func (cd *Cache) _unmarshal(b []byte, value any) error {
 	if len(b) == 0 {
 		return nil
 	}
